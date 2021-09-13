@@ -6,7 +6,7 @@ import { ethers } from 'ethers'
 import Keyv from "keyv"
 import { hash5, hashLeftRight, SparseMerkleTreeImpl, add0x, SnarkBigInt, hashOne, stringifyBigInts } from '@unirep/crypto'
 import { IncrementalQuinTree } from 'maci-crypto'
-import { circuitEpochTreeDepth, circuitNullifierTreeDepth, circuitUserStateTreeDepth, circuitGlobalStateTreeDepth, userStateTreeDepth, globalStateTreeDepth, epochTreeDepth, nullifierTreeDepth, numAttestationsPerProof } from '../config'
+import { circuitEpochTreeDepth, circuitNullifierTreeDepth, circuitUserStateTreeDepth, circuitGlobalStateTreeDepth, userStateTreeDepth, globalStateTreeDepth, epochTreeDepth, nullifierTreeDepth, numAttestationsPerProof, maxReputationBudget } from '../config'
 
 const SMT_ZERO_LEAF = hashLeftRight(BigInt(0), BigInt(0))
 const SMT_ONE_LEAF = hashLeftRight(BigInt(1), BigInt(0))
@@ -773,13 +773,10 @@ class UserState {
 
     public genProveReputationCircuitInputs = async (
         attesterId: BigInt,
-        provePosRep: BigInt,
-        proveNegRep: BigInt,
-        proveRepDiff: BigInt,
+        repNullifiersAmount: number,
+        testNonceStarter: number,
+        minRep: BigInt,
         proveGraffiti: BigInt,
-        minPosRep: BigInt,
-        maxNegRep: BigInt,
-        minRepDiff: BigInt,
         graffitiPreImage: BigInt,
     ) => {
         assert(this.hasSignedUp, "User has not signed up yet")
@@ -795,15 +792,22 @@ class UserState {
         const GSTree = this.unirepState.genGSTree(epoch)
         const GSTreeProof = GSTree.genMerklePath(this.latestGSTLeafIndex)
         const GSTreeRoot = GSTree.root
-        const nullifierTree = await this.unirepState.genNullifierTree()
-        const nullifierTreeRoot = nullifierTree.getRootHash()
-        const epkNullifier = genEpochKeyNullifier(this.id.identityNullifier, epoch, nonce, this.unirepState.nullifierTreeDepth)
-        const epkNullifierProof = await nullifierTree.getMerkleProof(epkNullifier)
         const USTPathElements = await userStateTree.getMerkleProof(attesterId)
+        const selectors: BigInt[] = []
+        const nonceList: BigInt[] = []
+
+        assert((testNonceStarter + repNullifiersAmount) <= Number(posRep) - Number(negRep), "Not enough karma to spend")
+        for (let i = 0; i < repNullifiersAmount; i++) {
+            nonceList.push( BigInt(testNonceStarter + i) )
+            selectors.push(BigInt(1));
+        }
+        for (let i = repNullifiersAmount ; i < maxReputationBudget; i++) {
+            nonceList.push(BigInt(0))
+            selectors.push(BigInt(0))
+        }
 
         return stringifyBigInts({
             epoch: epoch,
-            nonce: nonce,
             identity_pk: this.id.keypair.pubKey,
             identity_nullifier: this.id.identityNullifier, 
             identity_trapdoor: this.id.identityTrapdoor,
@@ -811,20 +815,16 @@ class UserState {
             GST_path_index: GSTreeProof.indices,
             GST_path_elements: GSTreeProof.pathElements,
             GST_root: GSTreeRoot,
-            nullifier_tree_root: nullifierTreeRoot,
-            nullifier_path_elements: epkNullifierProof,
             attester_id: attesterId,
             pos_rep: posRep,
             neg_rep: negRep,
             graffiti: graffiti,
             UST_path_elements: USTPathElements,
-            prove_pos_rep: provePosRep,
-            prove_neg_rep: proveNegRep,
-            prove_rep_diff: proveRepDiff,
+            rep_nullifiers_amount: repNullifiersAmount,
+            selectors: selectors,
+            rep_nonce: nonceList,
+            min_rep: minRep,
             prove_graffiti: proveGraffiti,
-            min_rep_diff: minRepDiff,
-            min_pos_rep: minPosRep,
-            max_neg_rep: maxNegRep,
             graffiti_pre_image: graffitiPreImage
         })
     }

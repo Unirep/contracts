@@ -1,7 +1,6 @@
 import * as argparse from 'argparse' 
 import * as fs from 'fs'
 import { getVKey } from "@unirep/circuits"
-
 import { genSnarkVerifierSol } from './genVerifier'
 
 const main = async () => {
