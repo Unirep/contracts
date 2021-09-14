@@ -16,6 +16,11 @@ npx ts-node scripts/buildVerifiers.ts -s build/ReputationVerifier.sol -vs Reputa
 echo 'Copying ReputationVerifier.sol to contracts/'
 cp ./build/ReputationVerifier.sol ./contracts/
 
+npx ts-node scripts/buildVerifiers.ts -s build/UserSignUpVerifier.sol -vs UserSignUpVerifier -cn proveUserSignUp
+
+echo 'Copying UserSignUpVerifier.sol to contracts/'
+cp ./build/UserSignUpVerifier.sol ./contracts/
+
 npx ts-node scripts/buildVerifiers.ts -s build/StartTransitionVerifier.sol -vs StartTransitionVerifier -cn startTransition
 
 echo 'Copying StartTransitionVerifier.sol to contracts/'

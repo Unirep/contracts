@@ -4,7 +4,7 @@ import { expect } from "chai"
 import { genRandomSalt, hashLeftRight, IncrementalQuinTree, genIdentity, genIdentityCommitment } from '@unirep/crypto'
 import { formatProofForVerifierContract, genProofAndPublicSignals, verifyProof } from '@unirep/circuits'
 
-import { attestingFee, epochLength, numEpochKeyNoncePerEpoch } from '../config'
+import { attestingFee, epochLength, maxReputationBudget, numEpochKeyNoncePerEpoch } from '../config'
 import { computeEmptyUserStateRoot, genEpochKey, getTreeDepthsForTesting, Attestation, IEpochTreeLeaf, UnirepState, UserState } from './utils'
 import { deployUnirep } from '../src'
 import Unirep from "../artifacts/contracts/Unirep.sol/Unirep.json"
@@ -26,6 +26,7 @@ describe('Epoch Transition', function () {
     let GSTree
     let circuitInputs
     let results
+    const signedUpInLeaf = 1
 
     before(async () => {
         accounts = await hardhatEthers.getSigners()
@@ -40,6 +41,7 @@ describe('Epoch Transition', function () {
             attestingFee,
             epochLength,
             numEpochKeyNoncePerEpoch,
+            maxReputationBudget,
         )
 
         console.log('User sign up')
@@ -85,6 +87,7 @@ describe('Epoch Transition', function () {
                 BigInt(i),
                 BigInt(0),
                 genRandomSalt(),
+                BigInt(signedUpInLeaf),
             ) 
             tx = await unirepContractCalledByAttester.submitAttestation(
                 attestation,
@@ -103,6 +106,7 @@ describe('Epoch Transition', function () {
             BigInt(0),
             BigInt(99),
             BigInt(0),
+            BigInt(signedUpInLeaf),
         )
         tx = await unirepContractCalledByAttester.submitAttestation(
             attestation,
@@ -330,6 +334,7 @@ describe('Epoch Transition', function () {
             negRep: 0,
             graffiti: genRandomSalt().toString(),
             overwriteGraffiti: true,
+            signUp: 0,
         }
 
         let prevEpoch = (await unirepContract.currentEpoch()).sub(1)

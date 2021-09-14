@@ -6,7 +6,7 @@ import { ethers } from 'ethers'
 import Keyv from "keyv"
 import { hash5, hashLeftRight, SparseMerkleTreeImpl, add0x, SnarkBigInt, hashOne, stringifyBigInts } from '@unirep/crypto'
 import { IncrementalQuinTree } from 'maci-crypto'
-import { circuitEpochTreeDepth, circuitNullifierTreeDepth, circuitUserStateTreeDepth, circuitGlobalStateTreeDepth, userStateTreeDepth, globalStateTreeDepth, epochTreeDepth, nullifierTreeDepth, numAttestationsPerProof, maxReputationBudget } from '../config'
+import { circuitEpochTreeDepth, circuitNullifierTreeDepth, circuitUserStateTreeDepth, circuitGlobalStateTreeDepth, numAttestationsPerProof, maxReputationBudget } from '../config'
 
 const SMT_ZERO_LEAF = hashLeftRight(BigInt(0), BigInt(0))
 const SMT_ONE_LEAF = hashLeftRight(BigInt(1), BigInt(0))
@@ -27,6 +27,7 @@ interface IAttestation {
     posRep: BigInt;
     negRep: BigInt;
     graffiti: BigInt;
+    signUp: BigInt;
     hash(): BigInt;
 }
 
@@ -35,17 +36,20 @@ class Attestation implements IAttestation {
     public posRep: BigInt
     public negRep: BigInt
     public graffiti: BigInt
+    public signUp: BigInt
 
     constructor(
         _attesterId: BigInt,
         _posRep: BigInt,
         _negRep: BigInt,
         _graffiti: BigInt,
+        _signUp: BigInt,
     ) {
         this.attesterId = _attesterId
         this.posRep = _posRep
         this.negRep = _negRep
         this.graffiti = _graffiti
+        this.signUp = _signUp
     }
 
     public hash = (): BigInt => {
@@ -54,6 +58,7 @@ class Attestation implements IAttestation {
             this.posRep,
             this.negRep,
             this.graffiti,
+            this.signUp,
         ])
     }
 }
@@ -62,6 +67,7 @@ interface IReputation {
     posRep: BigInt;
     negRep: BigInt;
     graffiti: BigInt;
+    signUp: BigInt;
 }
 
 class Reputation implements IReputation {
@@ -69,31 +75,36 @@ class Reputation implements IReputation {
     public negRep: BigInt
     public graffiti: BigInt
     public graffitiPreImage: BigInt = BigInt(0)
+    public signUp: BigInt
 
     constructor(
         _posRep: BigInt,
         _negRep: BigInt,
         _graffiti: BigInt,
+        _signUp: BigInt,
     ) {
         this.posRep = _posRep
         this.negRep = _negRep
         this.graffiti = _graffiti
+        this.signUp = _signUp
     }
 
     public static default(): Reputation {
-        return new Reputation(BigInt(0), BigInt(0), BigInt(0))
+        return new Reputation(BigInt(0), BigInt(0), BigInt(0), BigInt(0))
     }
 
     public update = (
         _posRep: BigInt,
         _negRep: BigInt,
         _graffiti: BigInt,
+        _signUp: BigInt,
     ): Reputation => {
         this.posRep = BigInt(Number(this.posRep) + Number(_posRep))
         this.negRep = BigInt(Number(this.negRep) + Number(_negRep))
         if(_graffiti != BigInt(0)){
             this.graffiti = _graffiti
         }
+        this.signUp = _signUp
         return this
     }
 
@@ -107,7 +118,7 @@ class Reputation implements IReputation {
             this.posRep,
             this.negRep,
             this.graffiti,
-            BigInt(0),
+            this.signUp,
             BigInt(0),
         ])
     }
@@ -122,6 +133,7 @@ class UnirepState {
     public attestingFee: ethers.BigNumber
     public epochLength: number
     public numEpochKeyNoncePerEpoch: number
+    public maxReputationBudget: number
     
     public currentEpoch: number
     public defaultGSTLeaf: BigInt
@@ -140,6 +152,7 @@ class UnirepState {
         _attestingFee: ethers.BigNumber,
         _epochLength: number,
         _numEpochKeyNoncePerEpoch: number,
+        _maxReputationBudget: number
     ) {
 
         this.globalStateTreeDepth = _globalStateTreeDepth
@@ -149,6 +162,7 @@ class UnirepState {
         this.attestingFee = _attestingFee
         this.epochLength = _epochLength
         this.numEpochKeyNoncePerEpoch = _numEpochKeyNoncePerEpoch
+        this.maxReputationBudget = _maxReputationBudget
 
         this.currentEpoch = 1
         this.GSTLeaves[this.currentEpoch] = []
@@ -427,10 +441,11 @@ class UserState {
         this.latestTransitionedEpoch = _latestTransitionedEpoch
         this.latestGSTLeafIndex = _latestGSTLeafIndex
         this.hasSignedUp = true
+        const signUpInLeaf = 1
         if(_attesterId && _airdropAmount) {
             const stateLeave: IUserStateLeaf = {
                 attesterId: BigInt(_attesterId),
-                reputation: Reputation.default().update(BigInt(_airdropAmount), BigInt(0), BigInt(0))
+                reputation: Reputation.default().update(BigInt(_airdropAmount), BigInt(0), BigInt(0), BigInt(signUpInLeaf))
             }
             this.latestUserStateLeaves = [ stateLeave ]
         }
@@ -491,7 +506,8 @@ class UserState {
                 leaf.reputation = leaf.reputation.update(
                     attestation.posRep,
                     attestation.negRep,
-                    attestation.graffiti
+                    attestation.graffiti,
+                    attestation.signUp,
                 )
                 return stateLeaves
             }
@@ -499,7 +515,7 @@ class UserState {
         // If no matching state leaf, insert new one
         const newLeaf: IUserStateLeaf = {
             attesterId: attesterId,
-            reputation: Reputation.default().update(attestation.posRep, attestation.negRep, attestation.graffiti)
+            reputation: Reputation.default().update(attestation.posRep, attestation.negRep, attestation.graffiti, attestation.signUp)
         }
         stateLeaves.push(newLeaf)
         return stateLeaves
@@ -606,8 +622,8 @@ class UserState {
         let reputationRecords = {}
         const selectors: number[] = []
         const attesterIds: BigInt[] = []
-        const oldPosReps: BigInt[] = [], oldNegReps: BigInt[] = [], oldGraffities: BigInt[] = []
-        const posReps: BigInt[] = [], negReps: BigInt[] = [], graffities: BigInt[] = [], overwriteGraffities: any[] = []
+        const oldPosReps: BigInt[] = [], oldNegReps: BigInt[] = [], oldGraffities: BigInt[] = [], oldSignUps: BigInt[] = []
+        const posReps: BigInt[] = [], negReps: BigInt[] = [], graffities: BigInt[] = [], overwriteGraffities: any[] = [], signUps: BigInt[] = []
         const finalBlindedUserState: BigInt[] = []
         const finalUserState: BigInt[] = [ intermediateUserStateTreeRoots[0] ]
         const finalHashChain: BigInt[] = []
@@ -640,13 +656,15 @@ class UserState {
                     reputationRecords[attesterId.toString()] = new Reputation(
                         rep.posRep,
                         rep.negRep,
-                        rep.graffiti
+                        rep.graffiti,
+                        rep.signUp,
                     )
                 }
 
                 oldPosReps.push(reputationRecords[attesterId.toString()]['posRep'])
                 oldNegReps.push(reputationRecords[attesterId.toString()]['negRep'])
                 oldGraffities.push(reputationRecords[attesterId.toString()]['graffiti'])
+                oldSignUps.push(reputationRecords[attesterId.toString()]['signUp'])
 
                 // Add UST merkle proof to the list
                 const USTLeafPathElements = await fromEpochUserStateTree.getMerkleProof(attesterId)
@@ -657,6 +675,7 @@ class UserState {
                     attestation['posRep'],
                     attestation['negRep'],
                     attestation['graffiti'],
+                    attestation['signUp'],
                 )
 
                 // Update UST
@@ -670,6 +689,7 @@ class UserState {
                 negReps.push(attestation['negRep'])
                 graffities.push(attestation['graffiti'])
                 overwriteGraffities.push(attestation['graffiti'] != BigInt(0))
+                signUps.push(attestation['signUp'])
 
                 // Update current hashchain result
                 const attestationHash = attestation.hash()
@@ -681,6 +701,7 @@ class UserState {
                 oldPosReps.push(BigInt(0))
                 oldNegReps.push(BigInt(0))
                 oldGraffities.push(BigInt(0))
+                oldSignUps.push(BigInt(0))
                 
                 const USTLeafZeroPathElements = await fromEpochUserStateTree.getMerkleProof(BigInt(0))
                 userStateLeafPathElements.push(USTLeafZeroPathElements)
@@ -692,6 +713,7 @@ class UserState {
                 negReps.push(BigInt(0))
                 graffities.push(BigInt(0))
                 overwriteGraffities.push(BigInt(0))
+                signUps.push(BigInt(0))
             }
             epochKeyPathElements.push(await fromEpochTree.getMerkleProof(epochKey))
             finalUserState.push(fromEpochUserStateTree.getRootHash())
@@ -715,12 +737,14 @@ class UserState {
                 old_pos_reps: oldPosReps.slice(startIdx, endIdx),
                 old_neg_reps: oldNegReps.slice(startIdx, endIdx),
                 old_graffities: oldGraffities.slice(startIdx, endIdx),
+                old_sign_ups: oldSignUps.slice(startIdx, endIdx),
                 path_elements: userStateLeafPathElements.slice(startIdx, endIdx),
                 attester_ids: attesterIds.slice(startIdx, endIdx),
                 pos_reps: posReps.slice(startIdx, endIdx),
                 neg_reps: negReps.slice(startIdx, endIdx),
                 graffities: graffities.slice(startIdx, endIdx),
                 overwrite_graffities: overwriteGraffities.slice(startIdx, endIdx),
+                sign_ups: signUps.slice(startIdx, endIdx),
                 selectors: selectors.slice(startIdx, endIdx),
                 hash_chain_starter: hashChainStarter[i],
                 input_blinded_user_state: blindedUserState[i],
@@ -775,6 +799,7 @@ class UserState {
         attesterId: BigInt,
         repNullifiersAmount: number,
         testNonceStarter: number,
+        epkNonce: number,
         minRep: BigInt,
         proveGraffiti: BigInt,
         graffitiPreImage: BigInt,
@@ -783,11 +808,12 @@ class UserState {
         assert(attesterId > BigInt(0), `attesterId must be greater than zero`)
         assert(attesterId < BigInt(2 ** this.userStateTreeDepth), `attesterId exceeds total number of attesters`)
         const epoch = this.latestTransitionedEpoch
-        const nonce = 0
+        const epochKey = genEpochKey(this.id.identityNullifier, epoch, epkNonce)
         const rep = this.getRepByAttester(attesterId)
         const posRep = rep.posRep
         const negRep = rep.negRep
         const graffiti = rep.graffiti
+        const signUp = rep.signUp
         const userStateTree = await this.genUserStateTree()
         const GSTree = this.unirepState.genGSTree(epoch)
         const GSTreeProof = GSTree.genMerklePath(this.latestGSTLeafIndex)
@@ -808,6 +834,8 @@ class UserState {
 
         return stringifyBigInts({
             epoch: epoch,
+            epoch_key_nonce: epkNonce,
+            epoch_key: epochKey,
             identity_pk: this.id.keypair.pubKey,
             identity_nullifier: this.id.identityNullifier, 
             identity_trapdoor: this.id.identityTrapdoor,
@@ -819,6 +847,7 @@ class UserState {
             pos_rep: posRep,
             neg_rep: negRep,
             graffiti: graffiti,
+            sign_up: signUp,
             UST_path_elements: USTPathElements,
             rep_nullifiers_amount: repNullifiersAmount,
             selectors: selectors,

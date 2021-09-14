@@ -3,7 +3,7 @@ import { BigNumber, ethers } from 'ethers'
 import { expect } from "chai"
 import { genIdentity, genIdentityCommitment, IncrementalQuinTree } from '@unirep/crypto'
 
-import { attestingFee, epochLength, globalStateTreeDepth, numEpochKeyNoncePerEpoch, nullifierTreeDepth, userStateTreeDepth, epochTreeDepth} from '../config'
+import { attestingFee, epochLength, globalStateTreeDepth, numEpochKeyNoncePerEpoch, nullifierTreeDepth, userStateTreeDepth, epochTreeDepth, maxReputationBudget} from '../config'
 import { deployUnirep } from '../src'
 import { genNewUserStateTree, getTreeDepthsForTesting } from './utils'
 import Unirep from "../artifacts/contracts/Unirep.sol/Unirep.json"
@@ -25,6 +25,7 @@ describe('Signup', () => {
         const _settings = {
             maxUsers: testMaxUser,
             numEpochKeyNoncePerEpoch: numEpochKeyNoncePerEpoch,
+            maxReputationBudget: maxReputationBudget,
             epochLength: epochLength,
             attestingFee: attestingFee
         }

@@ -50,11 +50,13 @@ describe('EventSequencing', () => {
         let currentEpoch = await unirepContract.currentEpoch()
         let epochKeyNonce = 0
         let epochKey = genEpochKey(userIds[0].identityNullifier, currentEpoch.toNumber(), epochKeyNonce)
+        const signedUpInLeaf = 0
         let attestation: Attestation = new Attestation(
             BigInt(attesterId),
             BigInt(1),
             BigInt(0),
             genRandomSalt(),
+            BigInt(signedUpInLeaf),
         )
         tx = await unirepContractCalledByAttester.submitAttestation(
             attestation,
@@ -122,6 +124,7 @@ describe('EventSequencing', () => {
             BigInt(2),
             BigInt(1),
             genRandomSalt(),
+            BigInt(signedUpInLeaf),
         )
         tx = await unirepContractCalledByAttester.submitAttestation(
             attestation,

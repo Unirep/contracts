@@ -3,12 +3,13 @@
 // @ts-ignore
 import { ethers as hardhatEthers } from 'hardhat'
 import { ethers } from 'ethers'
-import { maxUsers, numEpochKeyNoncePerEpoch, epochLength, attestingFee } from '../config'
+import { maxUsers, numEpochKeyNoncePerEpoch, epochLength, attestingFee, maxReputationBudget } from '../config'
 
 import Unirep from "../artifacts/contracts/Unirep.sol/Unirep.json"
 import EpochKeyValidityVerifier from "../artifacts/contracts/EpochKeyValidityVerifier.sol/EpochKeyValidityVerifier.json"
-import StartTransitionVerifier from "../artifacts/contracts/StartTransitionVerifier.sol/StartTransitionVerifier.json"
 import ReputationVerifier from "../artifacts/contracts/ReputationVerifier.sol/ReputationVerifier.json"
+import UserSignUpVerifier from "../artifacts/contracts/UserSignUpVerifier.sol/UserSignUpVerifier.json"
+import StartTransitionVerifier from "../artifacts/contracts/StartTransitionVerifier.sol/StartTransitionVerifier.json"
 import UserStateTransitionVerifier from "../artifacts/contracts/UserStateTransitionVerifier.sol/UserStateTransitionVerifier.json"
 import ProcessAttestationsVerifier from "../artifacts/contracts/ProcessAttestationsVerifier.sol/ProcessAttestationsVerifier.json"
 
@@ -20,7 +21,7 @@ const deployUnirep = async (
     _treeDepths: any,
     _settings?: any): Promise<ethers.Contract> => {
     let PoseidonT3Contract, PoseidonT6Contract
-    let EpochKeyValidityVerifierContract, StartTransitionVerifierContract, ProcessAttestationsVerifierContract, UserStateTransitionVerifierContract, ReputationVerifierContract
+    let EpochKeyValidityVerifierContract, StartTransitionVerifierContract, ProcessAttestationsVerifierContract, UserStateTransitionVerifierContract, ReputationVerifierContract, UserSignUpVerifierContract
 
     console.log('Deploying PoseidonT3')
     const PoseidonT3Factory = new ethers.ContractFactory(PoseidonT3.abi, PoseidonT3.bytecode, deployer)
@@ -42,7 +43,6 @@ const deployUnirep = async (
     StartTransitionVerifierContract = await StartTransitionVerifierFactory.deploy()
     await StartTransitionVerifierContract.deployTransaction.wait()
 
-
     console.log('Deploying ProcessAttestationsVerifier')
     const ProcessAttestationsVerifierFactory = new ethers.ContractFactory(ProcessAttestationsVerifier.abi, ProcessAttestationsVerifier.bytecode, deployer)
     ProcessAttestationsVerifierContract = await ProcessAttestationsVerifierFactory.deploy()
@@ -58,17 +58,24 @@ const deployUnirep = async (
     ReputationVerifierContract = await ReputationVerifierFactory.deploy()
     await ReputationVerifierContract.deployTransaction.wait()
 
+    console.log('Deploying UserSignUpVerifier')
+    const  UserSignUpVerifierFactory = new ethers.ContractFactory(UserSignUpVerifier.abi,  UserSignUpVerifier.bytecode, deployer)
+    UserSignUpVerifierContract = await UserSignUpVerifierFactory.deploy()
+    await UserSignUpVerifierContract.deployTransaction.wait()
+
     console.log('Deploying Unirep')
 
-    let _maxUsers, _numEpochKeyNoncePerEpoch, _epochLength, _attestingFee
+    let _maxUsers, _numEpochKeyNoncePerEpoch, _maxReputationBudget, _epochLength, _attestingFee
     if (_settings) {
         _maxUsers = _settings.maxUsers
         _numEpochKeyNoncePerEpoch = _settings.numEpochKeyNoncePerEpoch
+        _maxReputationBudget = _settings.maxReputationBudget
         _epochLength = _settings.epochLength
         _attestingFee = _settings.attestingFee
     } else {
         _maxUsers = maxUsers
         _numEpochKeyNoncePerEpoch = numEpochKeyNoncePerEpoch
+        _maxReputationBudget = maxReputationBudget,
         _epochLength = epochLength
         _attestingFee = attestingFee
     }
@@ -92,7 +99,9 @@ const deployUnirep = async (
         ProcessAttestationsVerifierContract.address,
         UserStateTransitionVerifierContract.address,
         ReputationVerifierContract.address,
+        UserSignUpVerifierContract.address,
         _numEpochKeyNoncePerEpoch,
+        _maxReputationBudget,
         _epochLength,
         _attestingFee,
         {

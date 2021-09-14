@@ -14,6 +14,7 @@ import { StartTransitionVerifier } from './StartTransitionVerifier.sol';
 import { ProcessAttestationsVerifier } from './ProcessAttestationsVerifier.sol';
 import { UserStateTransitionVerifier } from './UserStateTransitionVerifier.sol';
 import { ReputationVerifier } from './ReputationVerifier.sol';
+import { UserSignUpVerifier } from './UserSignUpVerifier.sol';
 
 contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
     using SafeMath for uint256;
@@ -28,6 +29,7 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
     ProcessAttestationsVerifier internal processAttestationsVerifier;
     UserStateTransitionVerifier internal userStateTransitionVerifier;
     ReputationVerifier internal reputationVerifier;
+    UserSignUpVerifier internal userSignUpVerifier;
 
     uint256 public currentEpoch = 1;
 
@@ -43,6 +45,9 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
 
     // Maximum number of epoch keys allowed for an user to generate in one epoch
     uint8 immutable public numEpochKeyNoncePerEpoch;
+
+    // Maximum number of reputation nullifiers in a proof
+    uint8 immutable public maxReputationBudget;
 
     // The maximum number of signups allowed
     uint256 immutable public maxUsers;
@@ -147,7 +152,9 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
         ProcessAttestationsVerifier _processAttestationsVerifier,
         UserStateTransitionVerifier _userStateTransitionVerifier,
         ReputationVerifier _reputationVerifier,
+        UserSignUpVerifier _userSignUpVerifier,
         uint8 _numEpochKeyNoncePerEpoch,
+        uint8 _maxReputationBudget,
         uint256 _epochLength,
         uint256 _attestingFee
     ) {
@@ -160,8 +167,10 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
         processAttestationsVerifier = _processAttestationsVerifier;
         userStateTransitionVerifier = _userStateTransitionVerifier;
         reputationVerifier = _reputationVerifier;
+        userSignUpVerifier = _userSignUpVerifier;
 
         numEpochKeyNoncePerEpoch = _numEpochKeyNoncePerEpoch;
+        maxReputationBudget = _maxReputationBudget;
         epochLength = _epochLength;
         latestEpochTransitionTime = block.timestamp;
 
@@ -331,6 +340,7 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
         require(attestation.posRep < SNARK_SCALAR_FIELD, "Unirep: invalid attestation posRep");
         require(attestation.negRep < SNARK_SCALAR_FIELD, "Unirep: invalid attestation negRep");
         require(attestation.graffiti < SNARK_SCALAR_FIELD, "Unirep: invalid attestation graffiti");
+        require(attestation.signUp == 1 || attestation.signUp == 0, "Unirep: invalid attestation signUp");
         
         epochKeyHashchain[epochKey] = hashLeftRight(
             hashAttestation(attestation),
@@ -607,31 +617,34 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
     }
 
     function verifyReputation(
+        uint256[] calldata _repNullifiers,
         uint256 _epoch,
+        uint256 _epochKey,
         uint256 _globalStateTree,
-        uint256 _nullifierTree,
         uint256 _attesterId,
-        ReputationProofSignals memory _proofSignals,
-        uint256[8] memory _proof) external view returns (bool) {
+        uint256 _proveReputationAmount,
+        uint256 _minRep,
+        uint256 _proveGraffiti,
+        uint256 _graffitiPreImage,
+        uint256[8] calldata _proof) external view returns (bool) {
         // User prove his reputation by an attester:
         // 1. User exists in GST
         // 2. It is the latest state user transition to
-        // 3. (optional) positive reputation is greater than `_min_pos_rep`
-        // 4. (optional) negative reputation is less than `_max_neg_rep`
+        // 3. (optional) different reputation nullifiers equals to prove reputation amount
+        // 4. (optional) (positive reputation - negative reputation) is greater than `_minRep`
         // 5. (optional) hash of graffiti pre-image matches
-        uint256[] memory _publicSignals = new uint256[](12);
-        _publicSignals[0] = _epoch;
-        _publicSignals[1] = _globalStateTree;
-        _publicSignals[2] = _nullifierTree;
-        _publicSignals[3] = _attesterId;
-        _publicSignals[4] = _proofSignals.provePosRep;
-        _publicSignals[5] = _proofSignals.proveNegRep;
-        _publicSignals[6] = _proofSignals.proveRepDiff;
-        _publicSignals[7] = _proofSignals.proveGraffiti;
-        _publicSignals[8] = _proofSignals.minRepDiff;
-        _publicSignals[9] = _proofSignals.minPosRep;
-        _publicSignals[10] = _proofSignals.maxNegRep;
-        _publicSignals[11] = _proofSignals.graffitiPreImage;
+        uint256[] memory _publicSignals = new uint256[](18);
+        for (uint8 i = 0; i < maxReputationBudget; i++) {
+            _publicSignals[i] = _repNullifiers[i];
+        }
+        _publicSignals[maxReputationBudget] = _epoch;
+        _publicSignals[maxReputationBudget + 1] = _epochKey;
+        _publicSignals[maxReputationBudget + 2] = _globalStateTree;
+        _publicSignals[maxReputationBudget + 3] = _attesterId;
+        _publicSignals[maxReputationBudget + 4] = _proveReputationAmount;
+        _publicSignals[maxReputationBudget + 5] = _minRep;
+        _publicSignals[maxReputationBudget + 6] = _proveGraffiti;
+        _publicSignals[maxReputationBudget + 7] = _graffitiPreImage;
 
         // Ensure that each public input is within range of the snark scalar
         // field.
@@ -653,6 +666,45 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
 
         // Verify the proof
         proof.isValid = reputationVerifier.verifyProof(proof.a, proof.b, proof.c, _publicSignals);
+        return proof.isValid;
+    }
+
+    function verifyUserSignUp(
+        uint256 _epoch,
+        uint256 _epochKey,
+        uint256 _globalStateTree,
+        uint256 _attesterId,
+        uint256[8] calldata _proof) external view returns (bool) {
+        // User prove his reputation by an attester:
+        // 1. User exists in GST
+        // 2. It is the latest state user transition to
+        // 3. User has a signUp flag in the attester's leaf
+        uint256[] memory _publicSignals = new uint256[](4);
+        _publicSignals[0] = _epoch;
+        _publicSignals[1] = _epochKey;
+        _publicSignals[2] = _globalStateTree;
+        _publicSignals[3] = _attesterId;
+
+        // Ensure that each public input is within range of the snark scalar
+        // field.
+        // TODO: consider having more granular revert reasons
+        for (uint8 i = 0; i < _publicSignals.length; i++) {
+            require(
+                _publicSignals[i] < SNARK_SCALAR_FIELD,
+                "Unirep: each public signal must be lt the snark scalar field"
+            );
+        }
+
+        ProofsRelated memory proof;
+        // Unpack the snark proof
+        (   
+            proof.a,
+            proof.b,
+            proof.c
+        ) = unpackProof(_proof);
+
+        // Verify the proof
+        proof.isValid = userSignUpVerifier.verifyProof(proof.a, proof.b, proof.c, _publicSignals);
         return proof.isValid;
     }
 

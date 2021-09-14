@@ -4,7 +4,7 @@ import { expect } from "chai"
 import { genRandomSalt, hashLeftRight, hash5, stringifyBigInts, genIdentity, genIdentityCommitment } from '@unirep/crypto'
 import { genProofAndPublicSignals, verifyProof } from '@unirep/circuits'
 
-import { attestingFee, epochLength, maxUsers, numEpochKeyNoncePerEpoch, circuitUserStateTreeDepth } from '../config'
+import { attestingFee, epochLength, maxUsers, numEpochKeyNoncePerEpoch, circuitUserStateTreeDepth, maxReputationBudget } from '../config'
 import { getTreeDepthsForTesting, UnirepState, UserState, genNewSMT } from './utils'
 import { deployUnirep } from '../src'
 
@@ -25,6 +25,7 @@ describe('Airdrop', function () {
     const airdropPosRep = 20
     const repNullifiersAmount = 0
     const testNonceStarter = 0
+    const epkNonce = 0
 
 
     before(async () => {
@@ -34,6 +35,7 @@ describe('Airdrop', function () {
         const _settings = {
             maxUsers: maxUsers,
             numEpochKeyNoncePerEpoch: numEpochKeyNoncePerEpoch,
+            maxReputationBudget: maxReputationBudget,
             epochLength: epochLength,
             attestingFee: attestingFee
         }
@@ -46,6 +48,7 @@ describe('Airdrop', function () {
             attestingFee,
             epochLength,
             numEpochKeyNoncePerEpoch,
+            maxReputationBudget,
         )
     })
 
@@ -103,7 +106,7 @@ describe('Airdrop', function () {
 
         // expected airdropped user state
         const defaultLeafHash = hash5([])
-        const leafValue = hash5([BigInt(airdropPosRep)])
+        const leafValue = hash5([BigInt(airdropPosRep), BigInt(0), BigInt(0), BigInt(1)])
         const tree = await genNewSMT(circuitUserStateTreeDepth, defaultLeafHash)
         await tree.update(BigInt(attesterId), leafValue)
         const SMTRoot = await tree.getRootHash()
@@ -123,9 +126,9 @@ describe('Airdrop', function () {
         const latestTransitionedToEpoch = currentEpoch.toNumber()
         const GSTreeLeafIndex = 0
         userState.signUp(latestTransitionedToEpoch, GSTreeLeafIndex, attesterId, airdropPosRep)
-        const provePosRep = 1, proveNegRep = 0, proveRepDiff = 0, proveGraffiti = 0
-        const minPosRep = 19, maxNegRep = 0, minRepDiff = 0, graffitiPreImage = 0
-        const circuitInputs = await userState.genProveReputationCircuitInputs(BigInt(attesterId), repNullifiersAmount, testNonceStarter, minPosRep, proveGraffiti, graffitiPreImage)
+        const proveGraffiti = 0
+        const minPosRep = 19, graffitiPreImage = 0
+        const circuitInputs = await userState.genProveReputationCircuitInputs(BigInt(attesterId), repNullifiersAmount, testNonceStarter, epkNonce, minPosRep, proveGraffiti, graffitiPreImage)
         const startTime = new Date().getTime()
         const results = await genProofAndPublicSignals('proveReputation', stringifyBigInts(circuitInputs))
         const endTime = new Date().getTime()
@@ -167,9 +170,9 @@ describe('Airdrop', function () {
         const GSTreeLeafIndex = 0
         const airdropAmount = 0
         userState.signUp(latestTransitionedToEpoch, GSTreeLeafIndex, attester2Id, airdropAmount)
-        const provePosRep = 1, proveNegRep = 0, proveRepDiff = 0, proveGraffiti = 0
-        const minPosRep = 19, maxNegRep = 0, minRepDiff = 0, graffitiPreImage = 0
-        const circuitInputs = await userState.genProveReputationCircuitInputs(BigInt(attesterId), repNullifiersAmount, testNonceStarter, minPosRep, proveGraffiti, graffitiPreImage)
+        const proveGraffiti = 0
+        const minPosRep = 19, graffitiPreImage = 0
+        const circuitInputs = await userState.genProveReputationCircuitInputs(BigInt(attesterId), repNullifiersAmount, testNonceStarter, epkNonce, minPosRep, proveGraffiti, graffitiPreImage)
         const startTime = new Date().getTime()
         const results = await genProofAndPublicSignals('proveReputation', stringifyBigInts(circuitInputs))
         const endTime = new Date().getTime()
