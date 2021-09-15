@@ -228,19 +228,6 @@ describe('Epoch Transition', function () {
         console.log("Gas cost of submit a start transition proof:", receipt.gasUsed.toString())
     })
 
-    it('duplicated start user state transition proof should fail', async() => {
-        const blindedUserState = results['publicSignals'][0]
-        const blindedHashChain = results['publicSignals'][1]
-        const GSTreeRoot = results['publicSignals'][2]
-        await expect(unirepContract.startUserStateTransition(
-            blindedUserState,
-            blindedHashChain,
-            GSTreeRoot,
-            formatProofForVerifierContract(results['proof']),
-        ))
-            .to.be.revertedWith('Unirep: blinded user state has been submitted before')
-    })
-
     it('submit process attestations proofs should succeed', async() => {
         for (let i = 0; i < circuitInputs.processAttestationProof.length; i++) {
             results = await genProofAndPublicSignals('processAttestations', circuitInputs.processAttestationProof[i])
@@ -261,20 +248,6 @@ describe('Epoch Transition', function () {
             expect(receipt.status, 'Submit process attestations proof failed').to.equal(1)
             console.log("Gas cost of submit a process attestations proof:", receipt.gasUsed.toString())
         }
-    })
-
-    it('invalid blinded input should fail', async() => {
-        const outputBlindedUserState = results['publicSignals'][0]
-        const outputBlindedHashChain = results['publicSignals'][1]
-        const inputBlindedUserState = genRandomSalt()
-
-        await expect(unirepContract.processAttestations(
-            outputBlindedUserState,
-            outputBlindedHashChain,
-            inputBlindedUserState,
-            formatProofForVerifierContract(results['proof']),
-        ))
-            .to.be.revertedWith('Unirep: processing attestations with an invalid blinded user state')
     })
 
     it('submit user state transition proofs should succeed', async() => {

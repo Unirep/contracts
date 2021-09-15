@@ -91,9 +91,6 @@ describe('Attesting', () => {
         let attestationHashChain_ = await unirepContract.epochKeyHashchain(epochKey)
         expect(attestationHashChain).equal(attestationHashChain_)
 
-        // Verify the number of attestations to the epoch key
-        let numAttestationsToEpochKey_ = await unirepContract.numAttestationsToEpochKey(epochKey)
-        expect(numAttestationsToEpochKey_).equal(1)
         // Verify epoch key is added to epoch key list
         let numEpochKey = await unirepContract.getNumEpochKey(epoch)
         expect(numEpochKey).equal(1)
@@ -275,9 +272,6 @@ describe('Attesting', () => {
         let receipt = await tx.wait()
         expect(receipt.status).equal(1)
 
-        // Verify the number of attestations to the epoch key
-        let numAttestationsToEpochKey_ = await unirepContract.numAttestationsToEpochKey(epochKey)
-        expect(numAttestationsToEpochKey_).equal(3)
         // Verify attestation hash chain
         let attestationHashChainAfter = await unirepContract.epochKeyHashchain(epochKey)
         let attestationHashChain = hashLeftRight(

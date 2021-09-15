@@ -90,8 +90,12 @@ describe('EventSequencing', () => {
         // 5. Second user transition
         let transitionFromEpoch = 1
         const epkNullifiers: BigInt[] = []
+        const blindedHashChains: BigInt[] = []
+        const blindedUserStates: BigInt[] = []
         for (let i = 0; i < numEpochKeyNoncePerEpoch; i++) {
             epkNullifiers.push(BigInt(255))
+            blindedHashChains.push(BigInt(255))
+            blindedUserStates.push(BigInt(255))
         }
         const proof: BigInt[] = []
         for (let i = 0; i < 8; i++) {
@@ -102,19 +106,19 @@ describe('EventSequencing', () => {
         // process attestation proofs
 
         // update user state root proof
-        // tx = await unirepContract.updateUserStateRoot(
-        //     genRandomSalt(),
-        //     epkNullifiers,
-        //     blindedUserStates,
-        //     blindedHashChains,
-        //     transitionFromEpoch,
-        //     genRandomSalt(),
-        //     genRandomSalt(),
-        //     proof,
-        // )
-        // receipt = await tx.wait()
-        // expect(receipt.status).equal(1)
-        // expectedEventsInOrder.push(events[3])
+        tx = await unirepContract.updateUserStateRoot(
+            genRandomSalt(),
+            epkNullifiers,
+            blindedUserStates,
+            blindedHashChains,
+            transitionFromEpoch,
+            genRandomSalt(),
+            genRandomSalt(),
+            proof,
+        )
+        receipt = await tx.wait()
+        expect(receipt.status).equal(1)
+        expectedEventsInOrder.push(events[3])
 
         // 6. Attest to second user
         epochKeyNonce = 0
@@ -158,42 +162,42 @@ describe('EventSequencing', () => {
         // 9. First user transition
         transitionFromEpoch = 1
         // update user state root proof
-        // tx = await unirepContract.updateUserStateRoot(
-        //     genRandomSalt(),
-        //     epkNullifiers,
-        //     blindedUserStates,
-        //     blindedHashChains,
-        //     transitionFromEpoch,
-        //     genRandomSalt(),
-        //     genRandomSalt(),
-        //     proof,
-        // )
-        // receipt = await tx.wait()
-        // expect(receipt.status).equal(1)
-        // expectedEventsInOrder.push(events[3])
+        tx = await unirepContract.updateUserStateRoot(
+            genRandomSalt(),
+            epkNullifiers,
+            blindedUserStates,
+            blindedHashChains,
+            transitionFromEpoch,
+            genRandomSalt(),
+            genRandomSalt(),
+            proof,
+        )
+        receipt = await tx.wait()
+        expect(receipt.status).equal(1)
+        expectedEventsInOrder.push(events[3])
 
         // 10. Second user transition
         transitionFromEpoch = 2
         // update user state root proof
-        // tx = await unirepContract.updateUserStateRoot(
-        //     genRandomSalt(),
-        //     epkNullifiers,
-        //     blindedUserStates,
-        //     blindedHashChains,
-        //     transitionFromEpoch,
-        //     genRandomSalt(),
-        //     genRandomSalt(),
-        //     proof,
-        // )
-        // receipt = await tx.wait()
-        // expect(receipt.status).equal(1)
-        // expectedEventsInOrder.push(events[3])
+        tx = await unirepContract.updateUserStateRoot(
+            genRandomSalt(),
+            epkNullifiers,
+            blindedUserStates,
+            blindedHashChains,
+            transitionFromEpoch,
+            genRandomSalt(),
+            genRandomSalt(),
+            proof,
+        )
+        receipt = await tx.wait()
+        expect(receipt.status).equal(1)
+        expectedEventsInOrder.push(events[3])
     })
 
     it('Events order should match sequencer order', async () => {
         const sequencerFilter = unirepContract.filters.Sequencer()
         const sequencerEvents =  await unirepContract.queryFilter(sequencerFilter)
-        expect(sequencerEvents.length).to.be.equal(7)
+        expect(sequencerEvents.length).to.be.equal(10)
 
         for (let i = 0; i < sequencerEvents.length; i++) {
             const event = sequencerEvents[i]

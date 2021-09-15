@@ -20,6 +20,7 @@ describe('Verify user sign up verifier', function () {
     let GSTZERO_VALUE = 0, GSTree, GSTreeRoot, GSTreeProof
     let userStateTree: SparseMerkleTreeImpl, userStateRoot
     let hashedLeaf
+    let results
 
     let reputationRecords = {}
     const MIN_POS_REP = 20
@@ -89,7 +90,7 @@ describe('Verify user sign up verifier', function () {
             UST_path_elements: USTPathElements,
         }
         const startTime = new Date().getTime()
-        const results = await genProofAndPublicSignals('proveUserSignUp',stringifyBigInts(circuitInputs))
+        results = await genProofAndPublicSignals('proveUserSignUp',stringifyBigInts(circuitInputs))
         const endTime = new Date().getTime()
         console.log(`Gen Proof time: ${endTime - startTime} ms (${Math.floor((endTime - startTime) / 1000)} s)`)
         const isValid = await verifyProof('proveUserSignUp',results['proof'], results['publicSignals'])
@@ -103,5 +104,43 @@ describe('Verify user sign up verifier', function () {
             formatProofForVerifierContract(results['proof']),
         )
         expect(isProofValid, 'Verify reputation proof on-chain failed').to.be.true
+    })
+
+    it('wrong attesterId should fail', async () => {
+        const wrongAttesterId = nonSignedUpAttesterId
+        const isProofValid = await unirepContract.verifyUserSignUp(
+            epoch,
+            epochKey,
+            GSTreeRoot,
+            wrongAttesterId,
+            formatProofForVerifierContract(results['proof']),
+        )
+        expect(isProofValid, 'Verify user sign up proof on-chain should fail').to.be.false
+    })
+
+    it('wrong epoch should fail', async () => {
+        const attesterId = signedUpAttesterId
+        const wrongEpoch = epoch + 1
+        const isProofValid = await unirepContract.verifyUserSignUp(
+            wrongEpoch,
+            epochKey,
+            GSTreeRoot,
+            attesterId,
+            formatProofForVerifierContract(results['proof']),
+        )
+        expect(isProofValid, 'Verify user sign up proof on-chain should fail').to.be.false
+    })
+
+    it('wrong epoch key should fail', async () => {
+        const attesterId = signedUpAttesterId
+        const wrongEpochKey = genEpochKey(user['identityNullifier'], epoch, nonce + 1, circuitEpochTreeDepth)
+        const isProofValid = await unirepContract.verifyUserSignUp(
+            epoch,
+            wrongEpochKey,
+            GSTreeRoot,
+            attesterId,
+            formatProofForVerifierContract(results['proof']),
+        )
+        expect(isProofValid, 'Verify user sign up proof on-chain should fail').to.be.false
     })
 })
