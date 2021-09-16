@@ -34,14 +34,14 @@ contract UnirepParameters {
         uint256[] epkNullifiers;
     }
 
-    struct ReputationProofSignals{
-        uint256 provePosRep;
-        uint256 proveNegRep;
-        uint256 proveRepDiff;
+    struct ReputationProofRelated{
+        uint256 epochKey;
+        uint256 globalStateTree;
+        uint256 attesterId;
+        uint256 proveReputationAmount;
+        uint256 minRep;
         uint256 proveGraffiti;
-        uint256 minRepDiff;
-        uint256 minPosRep;
-        uint256 maxNegRep;
         uint256 graffitiPreImage;
+        uint256[8] proof;
     }
 }

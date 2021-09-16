@@ -4,7 +4,7 @@ import { expect } from "chai"
 import { genRandomSalt, hashLeftRight, IncrementalQuinTree, genIdentity, genIdentityCommitment } from '@unirep/crypto'
 import { formatProofForVerifierContract, genProofAndPublicSignals, verifyProof } from '@unirep/circuits'
 
-import { attestingFee, epochLength, numEpochKeyNoncePerEpoch } from '../config'
+import { attestingFee, epochLength, maxReputationBudget, numEpochKeyNoncePerEpoch } from '../config'
 import { computeEmptyUserStateRoot, genEpochKey, getTreeDepthsForTesting, Attestation, IEpochTreeLeaf, UnirepState, UserState } from './utils'
 import { deployUnirep } from '../src'
 import Unirep from "../artifacts/contracts/Unirep.sol/Unirep.json"
@@ -26,6 +26,7 @@ describe('Epoch Transition', function () {
     let GSTree
     let circuitInputs
     let results
+    const signedUpInLeaf = 1
 
     before(async () => {
         accounts = await hardhatEthers.getSigners()
@@ -40,6 +41,7 @@ describe('Epoch Transition', function () {
             attestingFee,
             epochLength,
             numEpochKeyNoncePerEpoch,
+            maxReputationBudget,
         )
 
         console.log('User sign up')
@@ -85,6 +87,7 @@ describe('Epoch Transition', function () {
                 BigInt(i),
                 BigInt(0),
                 genRandomSalt(),
+                BigInt(signedUpInLeaf),
             ) 
             tx = await unirepContractCalledByAttester.submitAttestation(
                 attestation,
@@ -103,6 +106,7 @@ describe('Epoch Transition', function () {
             BigInt(0),
             BigInt(99),
             BigInt(0),
+            BigInt(signedUpInLeaf),
         )
         tx = await unirepContractCalledByAttester.submitAttestation(
             attestation,
@@ -224,19 +228,6 @@ describe('Epoch Transition', function () {
         console.log("Gas cost of submit a start transition proof:", receipt.gasUsed.toString())
     })
 
-    it('duplicated start user state transition proof should fail', async() => {
-        const blindedUserState = results['publicSignals'][0]
-        const blindedHashChain = results['publicSignals'][1]
-        const GSTreeRoot = results['publicSignals'][2]
-        await expect(unirepContract.startUserStateTransition(
-            blindedUserState,
-            blindedHashChain,
-            GSTreeRoot,
-            formatProofForVerifierContract(results['proof']),
-        ))
-            .to.be.revertedWith('Unirep: blinded user state has been submitted before')
-    })
-
     it('submit process attestations proofs should succeed', async() => {
         for (let i = 0; i < circuitInputs.processAttestationProof.length; i++) {
             results = await genProofAndPublicSignals('processAttestations', circuitInputs.processAttestationProof[i])
@@ -257,20 +248,6 @@ describe('Epoch Transition', function () {
             expect(receipt.status, 'Submit process attestations proof failed').to.equal(1)
             console.log("Gas cost of submit a process attestations proof:", receipt.gasUsed.toString())
         }
-    })
-
-    it('invalid blinded input should fail', async() => {
-        const outputBlindedUserState = results['publicSignals'][0]
-        const outputBlindedHashChain = results['publicSignals'][1]
-        const inputBlindedUserState = genRandomSalt()
-
-        await expect(unirepContract.processAttestations(
-            outputBlindedUserState,
-            outputBlindedHashChain,
-            inputBlindedUserState,
-            formatProofForVerifierContract(results['proof']),
-        ))
-            .to.be.revertedWith('Unirep: processing attestations with an invalid blinded user state')
     })
 
     it('submit user state transition proofs should succeed', async() => {
@@ -330,6 +307,7 @@ describe('Epoch Transition', function () {
             negRep: 0,
             graffiti: genRandomSalt().toString(),
             overwriteGraffiti: true,
+            signUp: 0,
         }
 
         let prevEpoch = (await unirepContract.currentEpoch()).sub(1)

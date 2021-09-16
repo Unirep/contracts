@@ -3,7 +3,7 @@ import { ethers } from 'ethers'
 import { expect } from "chai"
 import { genRandomSalt, hashLeftRight, SNARK_FIELD_SIZE, genIdentity, genIdentityCommitment } from '@unirep/crypto'
 
-import { attestingFee, epochLength, maxUsers, numEpochKeyNoncePerEpoch } from '../config'
+import { attestingFee, epochLength, maxReputationBudget, maxUsers, numEpochKeyNoncePerEpoch } from '../config'
 import { genEpochKey, getTreeDepthsForTesting, Attestation } from './utils'
 import { deployUnirep } from '../src'
 import Unirep from "../artifacts/contracts/Unirep.sol/Unirep.json"
@@ -18,6 +18,7 @@ describe('Attesting', () => {
     let attester, attesterAddress, attesterId, unirepContractCalledByAttester
     let attester2, attester2Address, attester2Id, unirepContractCalledByAttester2
 
+    const signedUpInLeaf = 1
 
     before(async () => {
         accounts = await hardhatEthers.getSigners()
@@ -26,6 +27,7 @@ describe('Attesting', () => {
         const _settings = {
             maxUsers: maxUsers,
             numEpochKeyNoncePerEpoch: numEpochKeyNoncePerEpoch,
+            maxReputationBudget: maxReputationBudget,
             epochLength: epochLength,
             attestingFee: attestingFee
         }
@@ -65,6 +67,7 @@ describe('Attesting', () => {
             BigInt(1),
             BigInt(0),
             genRandomSalt(),
+            BigInt(signedUpInLeaf),
         )
         // Assert no attesting fees are collected yet
         expect(await unirepContract.collectedAttestingFee()).to.be.equal(0)
@@ -88,9 +91,6 @@ describe('Attesting', () => {
         let attestationHashChain_ = await unirepContract.epochKeyHashchain(epochKey)
         expect(attestationHashChain).equal(attestationHashChain_)
 
-        // Verify the number of attestations to the epoch key
-        let numAttestationsToEpochKey_ = await unirepContract.numAttestationsToEpochKey(epochKey)
-        expect(numAttestationsToEpochKey_).equal(1)
         // Verify epoch key is added to epoch key list
         let numEpochKey = await unirepContract.getNumEpochKey(epoch)
         expect(numEpochKey).equal(1)
@@ -108,6 +108,7 @@ describe('Attesting', () => {
             BigInt(0),
             BigInt(1000),
             genRandomSalt(),
+            BigInt(signedUpInLeaf),
         )
         const tx = await unirepContractCalledByAttester.submitAttestation(
             attestation,
@@ -129,6 +130,7 @@ describe('Attesting', () => {
             BigInt(1),
             BigInt(0),
             genRandomSalt(),
+            BigInt(signedUpInLeaf),
         )
         await expect(unirepContractCalledByAttester.submitAttestation(
             attestation,
@@ -147,6 +149,7 @@ describe('Attesting', () => {
             SNARK_FIELD_SIZE,
             BigInt(0),
             genRandomSalt(),
+            BigInt(signedUpInLeaf),
         )
         await expect(unirepContractCalledByAttester.submitAttestation(
             attestation,
@@ -159,6 +162,7 @@ describe('Attesting', () => {
             BigInt(1),
             SNARK_FIELD_SIZE,
             genRandomSalt(),
+            BigInt(signedUpInLeaf),
         )
         await expect(unirepContractCalledByAttester.submitAttestation(
             attestation,
@@ -171,12 +175,26 @@ describe('Attesting', () => {
             BigInt(1),
             BigInt(0),
             SNARK_FIELD_SIZE,
+            BigInt(signedUpInLeaf),
         )
         await expect(unirepContractCalledByAttester.submitAttestation(
             attestation,
             epochKey,
             {value: attestingFee})
         ).to.be.revertedWith('Unirep: invalid attestation graffiti')
+
+        attestation = new Attestation(
+            BigInt(attesterId),
+            BigInt(1),
+            BigInt(0),
+            genRandomSalt(),
+            genRandomSalt(),
+        )
+        await expect(unirepContractCalledByAttester.submitAttestation(
+            attestation,
+            epochKey,
+            {value: attestingFee})
+        ).to.be.revertedWith('Unirep: invalid attestation signUp')
     })
 
     it('submit attestation with incorrect fee amount should fail', async () => {
@@ -189,6 +207,7 @@ describe('Attesting', () => {
             BigInt(1),
             BigInt(0),
             genRandomSalt(),
+            BigInt(signedUpInLeaf),
         )
         await expect(unirepContractCalledByAttester.submitAttestation(attestation, epochKey))
             .to.be.revertedWith('Unirep: no attesting fee or incorrect amount')
@@ -219,6 +238,7 @@ describe('Attesting', () => {
             BigInt(0),
             BigInt(1),
             genRandomSalt(),
+            BigInt(signedUpInLeaf),
         )
         await expect(unirepContractCalledByNonAttester.submitAttestation(
             attestation,
@@ -242,6 +262,7 @@ describe('Attesting', () => {
             BigInt(0),
             BigInt(1),
             genRandomSalt(),
+            BigInt(signedUpInLeaf),
         )
         let tx = await unirepContractCalledByAttester2.submitAttestation(
             attestation,
@@ -251,9 +272,6 @@ describe('Attesting', () => {
         let receipt = await tx.wait()
         expect(receipt.status).equal(1)
 
-        // Verify the number of attestations to the epoch key
-        let numAttestationsToEpochKey_ = await unirepContract.numAttestationsToEpochKey(epochKey)
-        expect(numAttestationsToEpochKey_).equal(3)
         // Verify attestation hash chain
         let attestationHashChainAfter = await unirepContract.epochKeyHashchain(epochKey)
         let attestationHashChain = hashLeftRight(

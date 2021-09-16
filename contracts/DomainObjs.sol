@@ -16,10 +16,9 @@ contract DomainObjs is Hasher {
 
     function hashAirdroppedLeaf(uint256 airdropPosRep) public pure returns (uint256) {
         uint256[5] memory airdroppedLeafValues;
+        uint256 hasSignedUp = 1;
         airdroppedLeafValues[0] = airdropPosRep;
-        for (uint8 i = 1; i < 5; i++) {
-            airdroppedLeafValues[i] = 0;
-        }
+        airdroppedLeafValues[3] = hasSignedUp;
         return hash5(airdroppedLeafValues);
     }
 
@@ -32,6 +31,8 @@ contract DomainObjs is Hasher {
         uint256 negRep;
         // A hash of an arbitary string
         uint256 graffiti;
+        // A flag to indicate if user has signed up in this leaf
+        uint256 signUp;
     }
 
     function hashAttestation(Attestation memory attestation) internal pure returns (uint256) {
@@ -40,7 +41,7 @@ contract DomainObjs is Hasher {
         attestationData[1] = attestation.posRep;
         attestationData[2] = attestation.negRep;
         attestationData[3] = attestation.graffiti;
-        attestationData[4] = 0;
+        attestationData[4] = attestation.signUp;
         return hash5(attestationData);
     }
 }
