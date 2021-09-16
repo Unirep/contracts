@@ -122,10 +122,10 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
 
     event EpochEnded(uint256 indexed _epoch);
 
-    event StartTransitioned(
+    event StartedTransition(
         uint256 indexed _blindedUserState,
         uint256 indexed _blindedHashChain,
-        uint256 _GSTRoot,
+        uint256 indexed _GSTRoot,
         uint256[8] _proof
     );
 
@@ -383,6 +383,10 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
         uint256 _proveGraffiti,
         uint256 _graffitiPreImage,
         uint256[8] calldata _proof) external {
+        require(_epoch == currentEpoch, "Unirep: should submit a proof which matches current epoch");
+        require(_repNullifiers.length == maxReputationBudget, "Unirep: invalid number of rep nullifiers");
+        require(_proveReputationAmount <= maxReputationBudget, "Unirep: invalid number of proving reputation amount");
+        require(_attesterId < nextAttesterId, "Unirep: invalid attesterId");
         ReputationProofRelated memory reputationProofData;
         reputationProofData.epochKey = _epochKey;
         reputationProofData.globalStateTree = _globalStateTree;
@@ -440,8 +444,8 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
         uint256 _GSTRoot,
         uint256[8] calldata _proof
     ) external {
-        emit Sequencer("StartTransitioned");
-        emit StartTransitioned(
+        emit Sequencer("StartedTransition");
+        emit StartedTransition(
             _blindedUserState,
             _blindedHashChain,
             _GSTRoot,

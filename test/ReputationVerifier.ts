@@ -6,6 +6,7 @@ import { genRandomSalt, hashLeftRight, genIdentity, genIdentityCommitment, Incre
 import { circuitEpochTreeDepth, circuitGlobalStateTreeDepth, maxReputationBudget, circuitUserStateTreeDepth } from "../config"
 import { genEpochKey, genNewUserStateTree, getTreeDepthsForTesting, Reputation } from './utils'
 import { deployUnirep } from '../src'
+import Unirep from "../artifacts/contracts/Unirep.sol/Unirep.json"
 
 
 describe('Verify reputation verifier', function () {
@@ -45,7 +46,7 @@ describe('Verify reputation verifier', function () {
 
         // Bootstrap user state
         for (let i = 0; i < NUM_ATTESTERS; i++) {
-            let attesterId = Math.ceil(Math.random() * (2 ** circuitUserStateTreeDepth - 1))
+            let attesterId = i + 1
             while (reputationRecords[attesterId] !== undefined) attesterId = Math.floor(Math.random() * (2 ** circuitUserStateTreeDepth))
             const graffitiPreImage = genRandomSalt()
             reputationRecords[attesterId] = new Reputation(
@@ -253,6 +254,16 @@ describe('Verify reputation verifier', function () {
         expect(isProofValid, 'Verify reputation proof on-chain should fail').to.be.false
     })
 
+    it('sign up should succeed', async () => {
+        const attester = accounts[1]
+        const attesterAddress = await attester.getAddress()
+        const unirepContractCalledByAttester = await hardhatEthers.getContractAt(Unirep.abi, unirepContract.address, attester)
+        const tx = await unirepContractCalledByAttester.attesterSignUp()
+        const receipt = await tx.wait()
+        expect(receipt.status).equal(1)
+        attesterId = await unirepContract.attesters(attesterAddress)
+    })
+
     it('submit reputation nullifiers should succeed', async () => {
         const tx = await unirepContract.submitReputaionNullifiers(
             results['publicSignals'].slice(0, maxReputationBudget),
@@ -268,5 +279,69 @@ describe('Verify reputation verifier', function () {
         )
         const receipt = await tx.wait()
         expect(receipt.status).equal(1)
+    })
+
+    it('submit reputation nullifiers with invalid epoch should fail', async () => {
+        const invalidEpoch = epoch + 1
+        await expect(unirepContract.submitReputaionNullifiers(
+            results['publicSignals'].slice(0, maxReputationBudget),
+            invalidEpoch,
+            epochKey,
+            GSTreeRoot,
+            attesterId,
+            repNullifiersAmount,
+            minRep,
+            proveGraffiti,
+            reputationRecords[attesterId]['graffitiPreImage'],
+            formatProofForVerifierContract(results['proof']),
+        )).to.be.revertedWith('Unirep: should submit a proof which matches current epoch')
+    })
+
+    it('submit reputation nullifiers with wrong length of nullifiers should fail', async () => {
+        const wrongNullifiers = results['publicSignals'].slice(1, maxReputationBudget)
+        await expect(unirepContract.submitReputaionNullifiers(
+            wrongNullifiers,
+            epoch,
+            epochKey,
+            GSTreeRoot,
+            attesterId,
+            repNullifiersAmount,
+            minRep,
+            proveGraffiti,
+            reputationRecords[attesterId]['graffitiPreImage'],
+            formatProofForVerifierContract(results['proof']),
+        )).to.be.revertedWith('Unirep: invalid number of rep nullifiers')
+    })
+
+    it('submit reputation nullifiers with invalid reputation amount should fail', async () => {
+        const invalidRepAmount = maxReputationBudget + 1
+        await expect(unirepContract.submitReputaionNullifiers(
+            results['publicSignals'].slice(0, maxReputationBudget),
+            epoch,
+            epochKey,
+            GSTreeRoot,
+            attesterId,
+            invalidRepAmount,
+            minRep,
+            proveGraffiti,
+            reputationRecords[attesterId]['graffitiPreImage'],
+            formatProofForVerifierContract(results['proof']),
+        )).to.be.revertedWith('Unirep: invalid number of proving reputation amount')
+    })
+
+    it('submit reputation nullifiers with wrong attesterId should fail', async () => {
+        const wrongAttesterId = attesterId + 1
+        await expect(unirepContract.submitReputaionNullifiers(
+            results['publicSignals'].slice(0, maxReputationBudget),
+            epoch,
+            epochKey,
+            GSTreeRoot,
+            wrongAttesterId,
+            repNullifiersAmount,
+            minRep,
+            proveGraffiti,
+            reputationRecords[attesterId]['graffitiPreImage'],
+            formatProofForVerifierContract(results['proof']),
+        )).to.be.revertedWith('Unirep: invalid attesterId')
     })
 })
