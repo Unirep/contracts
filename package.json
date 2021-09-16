@@ -1,6 +1,6 @@
 {
   "name": "@unire/contracts",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "build/src/index.js",
   "author": "vivianjeng <vivi432@yahoo.com.tw>",
   "license": "MIT",
