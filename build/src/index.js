@@ -12,15 +12,16 @@ const ethers_1 = require("ethers");
 const config_1 = require("../config");
 const Unirep_json_1 = __importDefault(require("../artifacts/contracts/Unirep.sol/Unirep.json"));
 const EpochKeyValidityVerifier_json_1 = __importDefault(require("../artifacts/contracts/EpochKeyValidityVerifier.sol/EpochKeyValidityVerifier.json"));
-const StartTransitionVerifier_json_1 = __importDefault(require("../artifacts/contracts/StartTransitionVerifier.sol/StartTransitionVerifier.json"));
 const ReputationVerifier_json_1 = __importDefault(require("../artifacts/contracts/ReputationVerifier.sol/ReputationVerifier.json"));
+const UserSignUpVerifier_json_1 = __importDefault(require("../artifacts/contracts/UserSignUpVerifier.sol/UserSignUpVerifier.json"));
+const StartTransitionVerifier_json_1 = __importDefault(require("../artifacts/contracts/StartTransitionVerifier.sol/StartTransitionVerifier.json"));
 const UserStateTransitionVerifier_json_1 = __importDefault(require("../artifacts/contracts/UserStateTransitionVerifier.sol/UserStateTransitionVerifier.json"));
 const ProcessAttestationsVerifier_json_1 = __importDefault(require("../artifacts/contracts/ProcessAttestationsVerifier.sol/ProcessAttestationsVerifier.json"));
 const PoseidonT3_json_1 = __importDefault(require("../artifacts/contracts/Poseidon.sol/PoseidonT3.json"));
 const PoseidonT6_json_1 = __importDefault(require("../artifacts/contracts/Poseidon.sol/PoseidonT6.json"));
 const deployUnirep = async (deployer, _treeDepths, _settings) => {
     let PoseidonT3Contract, PoseidonT6Contract;
-    let EpochKeyValidityVerifierContract, StartTransitionVerifierContract, ProcessAttestationsVerifierContract, UserStateTransitionVerifierContract, ReputationVerifierContract;
+    let EpochKeyValidityVerifierContract, StartTransitionVerifierContract, ProcessAttestationsVerifierContract, UserStateTransitionVerifierContract, ReputationVerifierContract, UserSignUpVerifierContract;
     console.log('Deploying PoseidonT3');
     const PoseidonT3Factory = new ethers_1.ethers.ContractFactory(PoseidonT3_json_1.default.abi, PoseidonT3_json_1.default.bytecode, deployer);
     PoseidonT3Contract = await PoseidonT3Factory.deploy();
@@ -49,18 +50,24 @@ const deployUnirep = async (deployer, _treeDepths, _settings) => {
     const ReputationVerifierFactory = new ethers_1.ethers.ContractFactory(ReputationVerifier_json_1.default.abi, ReputationVerifier_json_1.default.bytecode, deployer);
     ReputationVerifierContract = await ReputationVerifierFactory.deploy();
     await ReputationVerifierContract.deployTransaction.wait();
+    console.log('Deploying UserSignUpVerifier');
+    const UserSignUpVerifierFactory = new ethers_1.ethers.ContractFactory(UserSignUpVerifier_json_1.default.abi, UserSignUpVerifier_json_1.default.bytecode, deployer);
+    UserSignUpVerifierContract = await UserSignUpVerifierFactory.deploy();
+    await UserSignUpVerifierContract.deployTransaction.wait();
     console.log('Deploying Unirep');
-    let _maxUsers, _numEpochKeyNoncePerEpoch, _epochLength, _attestingFee;
+    let _maxUsers, _numEpochKeyNoncePerEpoch, _maxReputationBudget, _epochLength, _attestingFee;
     if (_settings) {
         _maxUsers = _settings.maxUsers;
         _numEpochKeyNoncePerEpoch = _settings.numEpochKeyNoncePerEpoch;
+        _maxReputationBudget = _settings.maxReputationBudget;
         _epochLength = _settings.epochLength;
         _attestingFee = _settings.attestingFee;
     }
     else {
         _maxUsers = config_1.maxUsers;
         _numEpochKeyNoncePerEpoch = config_1.numEpochKeyNoncePerEpoch;
-        _epochLength = config_1.epochLength;
+        _maxReputationBudget = config_1.maxReputationBudget,
+            _epochLength = config_1.epochLength;
         _attestingFee = config_1.attestingFee;
     }
     const f = await hardhat_1.ethers.getContractFactory("Unirep", {
@@ -72,7 +79,7 @@ const deployUnirep = async (deployer, _treeDepths, _settings) => {
     });
     const c = await f.deploy(_treeDepths, {
         "maxUsers": _maxUsers
-    }, EpochKeyValidityVerifierContract.address, StartTransitionVerifierContract.address, ProcessAttestationsVerifierContract.address, UserStateTransitionVerifierContract.address, ReputationVerifierContract.address, _numEpochKeyNoncePerEpoch, _epochLength, _attestingFee, {
+    }, EpochKeyValidityVerifierContract.address, StartTransitionVerifierContract.address, ProcessAttestationsVerifierContract.address, UserStateTransitionVerifierContract.address, ReputationVerifierContract.address, UserSignUpVerifierContract.address, _numEpochKeyNoncePerEpoch, _maxReputationBudget, _epochLength, _attestingFee, {
         gasLimit: 9000000,
     });
     await c.deployTransaction.wait();
