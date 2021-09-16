@@ -119,6 +119,15 @@ const deployUnirep = async (
     return c
 }
 
+const getUnirepContract = async (addressOrName: string, signerOrProvider: ethers.Signer | ethers.providers.Provider | undefined ):Promise<ethers.Contract> => {
+    return new ethers.Contract(
+        addressOrName,
+        Unirep.abi,
+        signerOrProvider,
+    )
+}
+
 export {
-    deployUnirep
+    deployUnirep,
+    getUnirepContract,
 }

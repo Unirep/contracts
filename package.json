@@ -1,11 +1,11 @@
 {
   "name": "@unire/contracts",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "build/src/index.js",
   "author": "vivianjeng <vivi432@yahoo.com.tw>",
   "license": "MIT",
   "scripts": {
-    "build": "./scripts/buildVerifiers.sh && yarn compile",
+    "build": "./scripts/buildVerifiers.sh && yarn compile && tsc",
     "compile": "npx hardhat compile && npx ts-node scripts/buildPoseidon.ts",
     "test": "npx hardhat test"
   },
