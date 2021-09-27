@@ -63,7 +63,7 @@ describe('EventSequencing', () => {
         for (let i = 0; i < 8; i++) {
             proof.push(BigInt(0))
         }
-        tx = await unirepContractCalledByAttester.submitReputaionNullifiers(
+        tx = await unirepContractCalledByAttester.submitReputationNullifiers(
             reputationNullifiers,
             currentEpoch,
             epochKey,
@@ -129,6 +129,8 @@ describe('EventSequencing', () => {
         for (let i = 0; i < numEpochKeyNoncePerEpoch; i++) {
             epkNullifiers.push(BigInt(255))
             blindedHashChains.push(BigInt(255))
+        }
+        for (let i = 0; i < 2; i++) {
             blindedUserStates.push(BigInt(255))
         }
         tx = await unirepContract.startUserStateTransition(

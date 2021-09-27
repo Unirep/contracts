@@ -265,7 +265,7 @@ describe('Verify reputation verifier', function () {
     })
 
     it('submit reputation nullifiers should succeed', async () => {
-        const tx = await unirepContract.submitReputaionNullifiers(
+        const tx = await unirepContract.submitReputationNullifiers(
             results['publicSignals'].slice(0, maxReputationBudget),
             epoch,
             epochKey,
@@ -283,7 +283,7 @@ describe('Verify reputation verifier', function () {
 
     it('submit reputation nullifiers with invalid epoch should fail', async () => {
         const invalidEpoch = epoch + 1
-        await expect(unirepContract.submitReputaionNullifiers(
+        await expect(unirepContract.submitReputationNullifiers(
             results['publicSignals'].slice(0, maxReputationBudget),
             invalidEpoch,
             epochKey,
@@ -299,7 +299,7 @@ describe('Verify reputation verifier', function () {
 
     it('submit reputation nullifiers with wrong length of nullifiers should fail', async () => {
         const wrongNullifiers = results['publicSignals'].slice(1, maxReputationBudget)
-        await expect(unirepContract.submitReputaionNullifiers(
+        await expect(unirepContract.submitReputationNullifiers(
             wrongNullifiers,
             epoch,
             epochKey,
@@ -315,7 +315,7 @@ describe('Verify reputation verifier', function () {
 
     it('submit reputation nullifiers with invalid reputation amount should fail', async () => {
         const invalidRepAmount = maxReputationBudget + 1
-        await expect(unirepContract.submitReputaionNullifiers(
+        await expect(unirepContract.submitReputationNullifiers(
             results['publicSignals'].slice(0, maxReputationBudget),
             epoch,
             epochKey,
@@ -331,7 +331,7 @@ describe('Verify reputation verifier', function () {
 
     it('submit reputation nullifiers with wrong attesterId should fail', async () => {
         const wrongAttesterId = attesterId + 1
-        await expect(unirepContract.submitReputaionNullifiers(
+        await expect(unirepContract.submitReputationNullifiers(
             results['publicSignals'].slice(0, maxReputationBudget),
             epoch,
             epochKey,

@@ -7,10 +7,10 @@
   "scripts": {
     "build": "./scripts/buildVerifiers.sh && yarn compile && tsc",
     "compile": "npx hardhat compile && npx ts-node scripts/buildPoseidon.ts",
-    "test": "npx hardhat test"
+    "test": "npx hardhat test --no-compile"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^4.3.1",
+    "@openzeppelin/contracts": "^4.3.2",
     "@unirep/circuits": "git+https://github.com/Unirep/circuits.git",
     "@unirep/crypto": "git+https://github.com/Unirep/crypto.git",
     "argparse": "^2.0.1",

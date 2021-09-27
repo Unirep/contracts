@@ -257,8 +257,8 @@ describe('Epoch Transition', function () {
 
         const newGSTLeaf = results['publicSignals'][0]
         const outputEpkNullifiers = results['publicSignals'].slice(1,1 + numEpochKeyNoncePerEpoch)
-        const blindedUserStates = results['publicSignals'].slice(2 + numEpochKeyNoncePerEpoch,2 + 2 * numEpochKeyNoncePerEpoch)
-        const blindedHashChains = results['publicSignals'].slice(3 + 2*numEpochKeyNoncePerEpoch,3 + 3*numEpochKeyNoncePerEpoch)
+        const blindedUserStates = results['publicSignals'].slice(2 + numEpochKeyNoncePerEpoch, 4 + numEpochKeyNoncePerEpoch)
+        const blindedHashChains = results['publicSignals'].slice(5 + numEpochKeyNoncePerEpoch,5 + 2*numEpochKeyNoncePerEpoch)
         const fromEpoch = userState.latestTransitionedEpoch
         const fromEpochGSTree: IncrementalQuinTree = unirepState.genGSTree(fromEpoch)
         const GSTreeRoot = fromEpochGSTree.root
