@@ -372,7 +372,7 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
         );
     }
 
-    function submitReputaionNullifiers(
+    function submitReputationNullifiers(
         uint256[] calldata _repNullifiers,
         uint256 _epoch,
         uint256 _epochKey,
@@ -623,20 +623,19 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
         // 3. Attestations to each epoch key are processed and processed correctly
         // require(_epkNullifiers.length == numEpochKeyNoncePerEpoch, "Unirep: invalid number of epk nullifiers");
 
-        uint256[] memory _publicSignals = new uint256[](4 + numEpochKeyNoncePerEpoch * 3);
+        uint256[] memory _publicSignals = new uint256[](6 + numEpochKeyNoncePerEpoch * 2);
         _publicSignals[0] = _newGlobalStateTreeLeaf;
         for (uint8 i = 0; i < numEpochKeyNoncePerEpoch; i++) {
             _publicSignals[i + 1] = _epkNullifiers[i];
         }
         _publicSignals[1 + numEpochKeyNoncePerEpoch] = _transitionFromEpoch;
+        _publicSignals[2 + numEpochKeyNoncePerEpoch] = _blindedUserStates[0];
+        _publicSignals[3 + numEpochKeyNoncePerEpoch] = _blindedUserStates[1];
+        _publicSignals[4 + numEpochKeyNoncePerEpoch] = _fromGlobalStateTree;
         for (uint8 i = 0; i < numEpochKeyNoncePerEpoch; i++) {
-            _publicSignals[2 + numEpochKeyNoncePerEpoch + i] = _blindedUserStates[i];
+            _publicSignals[5 + numEpochKeyNoncePerEpoch + i] = _blindedHashChains[i];
         }
-        _publicSignals[2 + numEpochKeyNoncePerEpoch * 2] = _fromGlobalStateTree;
-        for (uint8 i = 0; i < numEpochKeyNoncePerEpoch; i++) {
-            _publicSignals[3 + numEpochKeyNoncePerEpoch * 2 + i] = _blindedHashChains[i];
-        }
-        _publicSignals[3 + numEpochKeyNoncePerEpoch * 3] = _fromEpochTree;
+        _publicSignals[5 + numEpochKeyNoncePerEpoch * 2] = _fromEpochTree;
 
         // Ensure that each public input is within range of the snark scalar
         // field.
