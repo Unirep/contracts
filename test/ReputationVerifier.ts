@@ -131,7 +131,7 @@ describe('Verify reputation verifier', function () {
     })
 
     it('mismatched reputation nullifiers and nullifiers amount should fail', async () => {
-        const wrongReputaionNullifierAmount = repNullifiersAmount + 1
+        const wrongReputationNullifierAmount = repNullifiersAmount + 1
 
         const isProofValid = await unirepContract.verifyReputation(
             results['publicSignals'].slice(0, maxReputationBudget),
@@ -139,7 +139,7 @@ describe('Verify reputation verifier', function () {
             epochKey,
             GSTreeRoot,
             attesterId,
-            wrongReputaionNullifierAmount,
+            wrongReputationNullifierAmount,
             minRep,
             proveGraffiti,
             reputationRecords[attesterId]['graffitiPreImage'],
@@ -149,13 +149,13 @@ describe('Verify reputation verifier', function () {
     })
 
     it('wrong nullifiers should fail', async () => {
-        const wrongReputaionNullifiers: BigInt[] = []
+        const wrongReputationNullifiers: BigInt[] = []
         for (let i = 0; i < maxReputationBudget; i++) {
-            wrongReputaionNullifiers.push(genRandomSalt())
+            wrongReputationNullifiers.push(genRandomSalt())
         }
 
         const isProofValid = await unirepContract.verifyReputation(
-            wrongReputaionNullifiers,
+            wrongReputationNullifiers,
             epoch,
             epochKey,
             GSTreeRoot,

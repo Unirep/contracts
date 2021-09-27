@@ -15,15 +15,11 @@ const circuitUserStateTreeDepth = 4;
 
 const circuitEpochTreeDepth = 32;
 
-const circuitNullifierTreeDepth = 128;
-
 const globalStateTreeDepth = circuitGlobalStateTreeDepth;
 
 const userStateTreeDepth = circuitUserStateTreeDepth;
 
 const epochTreeDepth = circuitEpochTreeDepth;
-
-const nullifierTreeDepth = circuitNullifierTreeDepth;
 
 const maxReputationBudget = 10;
 
@@ -34,14 +30,12 @@ export {
     circuitGlobalStateTreeDepth,
     circuitUserStateTreeDepth,
     circuitEpochTreeDepth,
-    circuitNullifierTreeDepth,
     epochLength,
     epochTreeDepth,
     globalStateTreeDepth,
     numEpochKeyNoncePerEpoch,
     numAttestationsPerProof,
     maxUsers,
-    nullifierTreeDepth,
     userStateTreeDepth,
     maxReputationBudget,
 }

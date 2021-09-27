@@ -6,7 +6,7 @@ import { ethers } from 'ethers'
 import Keyv from "keyv"
 import { hash5, hashLeftRight, SparseMerkleTreeImpl, add0x, SnarkBigInt, hashOne, stringifyBigInts } from '@unirep/crypto'
 import { IncrementalQuinTree } from 'maci-crypto'
-import { circuitEpochTreeDepth, circuitNullifierTreeDepth, circuitUserStateTreeDepth, circuitGlobalStateTreeDepth, numAttestationsPerProof, maxReputationBudget } from '../config'
+import { circuitEpochTreeDepth, circuitUserStateTreeDepth, circuitGlobalStateTreeDepth, numAttestationsPerProof, maxReputationBudget } from '../config'
 
 const SMT_ZERO_LEAF = hashLeftRight(BigInt(0), BigInt(0))
 const SMT_ONE_LEAF = hashLeftRight(BigInt(1), BigInt(0))
@@ -128,7 +128,6 @@ class UnirepState {
     public globalStateTreeDepth: number
     public userStateTreeDepth: number
     public epochTreeDepth: number
-    public nullifierTreeDepth: number
 
     public attestingFee: ethers.BigNumber
     public epochLength: number
@@ -148,7 +147,6 @@ class UnirepState {
         _globalStateTreeDepth: number,
         _userStateTreeDepth: number,
         _epochTreeDepth: number,
-        _nullifierTreeDepth: number,
         _attestingFee: ethers.BigNumber,
         _epochLength: number,
         _numEpochKeyNoncePerEpoch: number,
@@ -158,7 +156,6 @@ class UnirepState {
         this.globalStateTreeDepth = _globalStateTreeDepth
         this.userStateTreeDepth = _userStateTreeDepth
         this.epochTreeDepth = _epochTreeDepth
-        this.nullifierTreeDepth =_nullifierTreeDepth
         this.attestingFee = _attestingFee
         this.epochLength = _epochLength
         this.numEpochKeyNoncePerEpoch = _numEpochKeyNoncePerEpoch
@@ -255,25 +252,6 @@ class UnirepState {
     }
 
     /*
-     * Computes the epoch tree of given epoch
-     */
-    public genNullifierTree = async (): Promise<SparseMerkleTreeImpl> => {
-        const nullifierTree = await genNewSMT(this.nullifierTreeDepth, SMT_ZERO_LEAF)
-        // Reserve leaf 0
-        await nullifierTree.update(BigInt(0), SMT_ONE_LEAF)
-
-        const leaves = this.nullifiers
-        if (leaves.length == 0) return nullifierTree
-        else {
-            for (const leaf of leaves) {
-                await nullifierTree.update(leaf, SMT_ONE_LEAF)
-            }
-            return nullifierTree
-        }
-    }
-
-
-    /*
      * Add a new state leaf to the list of GST leaves of given epoch.
      */
     public signUp = (
@@ -324,7 +302,6 @@ class UnirepState {
 
         for (let nullifier of nullifiers) {
             if (nullifier > BigInt(0)) {
-                assert(nullifier < BigInt(2 ** this.nullifierTreeDepth), `Nullifier(${nullifier}) larger than max leaf value(2**nullifierTreeDepth)`)
                 assert(this.nullifiers.indexOf(nullifier) == -1, `Nullifier(${nullifier}) seen before`)
                 this.nullifiers.push(nullifier)
             }
@@ -397,10 +374,6 @@ class UserState {
         return this.unirepState.genEpochTree(epoch)
     }
 
-    public getUnirepStateNullifierTree = async (): Promise<SparseMerkleTreeImpl> => {
-        return this.unirepState.genNullifierTree()
-    }
-
     /*
      * Get the attestations of given epoch key
      */
@@ -414,7 +387,7 @@ class UserState {
     public getEpochKeyNullifiers = (epoch: number): BigInt[] => {
         const nullifiers: BigInt[] = []
         for (let nonce = 0; nonce < this.numEpochKeyNoncePerEpoch; nonce++) {
-            const nullifier = genEpochKeyNullifier(this.id.identityNullifier, epoch, nonce, this.unirepState.nullifierTreeDepth)
+            const nullifier = genEpochKeyNullifier(this.id.identityNullifier, epoch, nonce)
             nullifiers.push(nullifier)
         }
         return nullifiers
@@ -529,7 +502,7 @@ class UserState {
         stateLeaves = this.latestUserStateLeaves.slice()
 
         for (let nonce = 0; nonce < this.numEpochKeyNoncePerEpoch; nonce++) {
-            const epkNullifier = genEpochKeyNullifier(this.id.identityNullifier, fromEpoch, nonce, this.unirepState.nullifierTreeDepth)
+            const epkNullifier = genEpochKeyNullifier(this.id.identityNullifier, fromEpoch, nonce)
             assert(! this.unirepState.nullifierExist(epkNullifier), `Epoch key with nonce ${nonce} is already processed, it's nullifier: ${epkNullifier}`)
 
             const epochKey = genEpochKey(this.id.identityNullifier, fromEpoch, nonce, this.unirepState.epochTreeDepth)
@@ -869,7 +842,6 @@ const getTreeDepthsForTesting = () => {
         "userStateTreeDepth": circuitUserStateTreeDepth,
         "globalStateTreeDepth": circuitGlobalStateTreeDepth,
         "epochTreeDepth": circuitEpochTreeDepth,
-        "nullifierTreeDepth": circuitNullifierTreeDepth,
     }
 }
 
@@ -890,13 +862,6 @@ const genNewSMT = async (treeDepth: number, defaultLeafHash: BigInt) => {
 const genNewEpochTree = async (_epochTreeDepth: number = circuitEpochTreeDepth) => {
     const defaultOTSMTHash = SMT_ONE_LEAF
     return genNewSMT(_epochTreeDepth, defaultOTSMTHash)
-}
-
-const genNewNullifierTree = async (_nullifierTreeDepth: number = circuitNullifierTreeDepth) => {
-    const nullifierTree = await genNewSMT(_nullifierTreeDepth, SMT_ZERO_LEAF)
-    // Reserve leaf 0
-    await nullifierTree.update(BigInt(0), SMT_ONE_LEAF)
-    return nullifierTree
 }
 
 const defaultUserStateLeaf = hash5([BigInt(0), BigInt(0), BigInt(0), BigInt(0), BigInt(0)])
@@ -928,11 +893,8 @@ const genEpochKey = (identityNullifier: SnarkBigInt, epoch: number, nonce: numbe
     return epochKeyModed
 }
 
-const genEpochKeyNullifier = (identityNullifier: SnarkBigInt, epoch: number, nonce: number, _nullifierTreeDepth: number = circuitNullifierTreeDepth): SnarkBigInt => {
-    let nullifier = hash5([EPOCH_KEY_NULLIFIER_DOMAIN, identityNullifier, BigInt(epoch), BigInt(nonce), BigInt(0)]).toString()
-    // Adjust epoch key size according to epoch tree depth
-    const nullifierModed = BigInt(nullifier) % BigInt(2 ** _nullifierTreeDepth)
-    return nullifierModed
+const genEpochKeyNullifier = (identityNullifier: SnarkBigInt, epoch: number, nonce: number): SnarkBigInt => {
+    return hash5([EPOCH_KEY_NULLIFIER_DOMAIN, identityNullifier, BigInt(epoch), BigInt(nonce), BigInt(0)])
 }
 
 export {
@@ -947,7 +909,6 @@ export {
     defaultUserStateLeaf,
     getTreeDepthsForTesting,
     genNewEpochTree,
-    genNewNullifierTree,
     genNewUserStateTree,
     genNewSMT,
     toCompleteHexString,

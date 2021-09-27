@@ -317,7 +317,7 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
      * An attester submit the attestation with a reputation proof via a relayer
      * @param attester The address of the attester
      * @param signature The signature of the attester
-     * @param attestation The attestation including positive reputaiton, negative reputaiton or graffiti
+     * @param attestation The attestation including positive reputation, negative reputation or graffiti
      * @param epochKey The attester wants to send attestation to
      */
     function submitAttestationViaRelayer(

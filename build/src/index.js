@@ -92,7 +92,7 @@ const deployUnirep = async (deployer, _treeDepths, _settings) => {
     return c;
 };
 exports.deployUnirep = deployUnirep;
-const getUnirepContract = async (addressOrName, signerOrProvider) => {
+const getUnirepContract = (addressOrName, signerOrProvider) => {
     return new ethers_1.ethers.Contract(addressOrName, Unirep_json_1.default.abi, signerOrProvider);
 };
 exports.getUnirepContract = getUnirepContract;
