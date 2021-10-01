@@ -3,7 +3,7 @@
 // @ts-ignore
 import { ethers as hardhatEthers } from 'hardhat'
 import { ethers } from 'ethers'
-import { maxUsers, numEpochKeyNoncePerEpoch, epochLength, attestingFee, maxReputationBudget } from '../config'
+import { maxUsers, maxAttesters, numEpochKeyNoncePerEpoch, epochLength, attestingFee, maxReputationBudget } from '../config'
 
 import Unirep from "../artifacts/contracts/Unirep.sol/Unirep.json"
 import EpochKeyValidityVerifier from "../artifacts/contracts/EpochKeyValidityVerifier.sol/EpochKeyValidityVerifier.json"
@@ -65,15 +65,17 @@ const deployUnirep = async (
 
     console.log('Deploying Unirep')
 
-    let _maxUsers, _numEpochKeyNoncePerEpoch, _maxReputationBudget, _epochLength, _attestingFee
+    let _maxUsers, _maxAttesters, _numEpochKeyNoncePerEpoch, _maxReputationBudget, _epochLength, _attestingFee
     if (_settings) {
         _maxUsers = _settings.maxUsers
+        _maxAttesters = _settings.maxAttesters,
         _numEpochKeyNoncePerEpoch = _settings.numEpochKeyNoncePerEpoch
         _maxReputationBudget = _settings.maxReputationBudget
         _epochLength = _settings.epochLength
         _attestingFee = _settings.attestingFee
     } else {
         _maxUsers = maxUsers
+        _maxAttesters = maxAttesters
         _numEpochKeyNoncePerEpoch = numEpochKeyNoncePerEpoch
         _maxReputationBudget = maxReputationBudget,
         _epochLength = epochLength
@@ -92,7 +94,8 @@ const deployUnirep = async (
     const c = await f.deploy(
         _treeDepths,
         {
-            "maxUsers": _maxUsers
+            "maxUsers": _maxUsers,
+            "maxAttesters": _maxAttesters,
         },
         EpochKeyValidityVerifierContract.address,
         StartTransitionVerifierContract.address,

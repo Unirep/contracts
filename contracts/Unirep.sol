@@ -52,11 +52,14 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
     // The maximum number of signups allowed
     uint256 immutable public maxUsers;
 
-    uint256 immutable public zeroNullifier;
+    // The maximum number of attesters allowed
+    uint256 immutable public maxAttesters;
 
     uint256 public numUserSignUps = 0;
 
     uint256 internal nextGSTLeafIndex = 0;
+
+    uint256 internal attestationIndex = 0;
 
     mapping(uint256 => bool) public hasUserSignedUp;
 
@@ -73,20 +76,6 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
     mapping(address => uint256) public attesters;
 
     uint256 public nextAttesterId = 1;
-
-    // Indicate if hash chain of an epoch key is sealed
-    mapping(uint256 => bool) public isEpochKeyHashChainSealed;
-
-    // Mapping between epoch key and hashchain of attestations which attest to the epoch key
-    mapping(uint256 => uint256) public epochKeyHashchain;
-
-    struct EpochKeyList {
-        uint256 numKeys;
-        mapping(uint256 => uint256) keys;
-        uint256 numSealedKeys;
-    }
-    // Mpapping of epoch to epoch key list
-    mapping(uint256 => EpochKeyList) internal epochKeys;
 
     // Mapping of the airdrop amount of an attester
     mapping(address => uint256) public airdropAmount;
@@ -111,11 +100,16 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
         uint256 indexed _epoch,
         uint256 indexed _epochKey,
         address indexed _attester,
-        Attestation attestation
+        uint256 _attestationIndex,
+        Attestation attestation,
+        EpochKeyProofRelated epkProofData
     );
 
     event ReputationNullifierSubmitted(
         uint256 indexed _epoch,
+        uint256 indexed _epochKey,
+        address indexed _attester,
+        uint256 _attestationIndex,
         ReputationProofRelated reputationProofData,
         uint256[] reputationNullifiers
     );
@@ -141,21 +135,6 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
         uint256 _leafIndex,
         UserTransitionedRelated userTransitionedData
     );
-
-
-    function getNumEpochKey(uint256 epoch) public view returns (uint256) {
-        return epochKeys[epoch].numKeys;
-    }
-
-    function getNumSealedEpochKey(uint256 epoch) public view returns (uint256) {
-        return epochKeys[epoch].numSealedKeys;
-    }
-
-    function getEpochKey(uint256 epoch, uint256 index) public view returns (uint256) {
-        require(index < epochKeys[epoch].numKeys, "Unirep: epoch key list access out of bound");
-        return epochKeys[epoch].keys[index];
-    }
-
 
     constructor(
         TreeDepths memory _treeDepths,
@@ -190,9 +169,13 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
         // Check and store the maximum number of signups
         // It is the user's responsibility to ensure that the state tree depth
         // is just large enough and not more, or they will waste gas.
-        uint256 stateTreeMaxLeafIndex = uint256(2) ** _treeDepths.globalStateTreeDepth - 1;
-        require(_maxValues.maxUsers <= stateTreeMaxLeafIndex, "Unirep: invalid maxUsers value");
+        uint256 GSTMaxLeafIndex = uint256(2) ** _treeDepths.globalStateTreeDepth - 1;
+        require(_maxValues.maxUsers <= GSTMaxLeafIndex, "Unirep: invalid maxUsers value");
         maxUsers = _maxValues.maxUsers;
+
+        uint256 USTMaxLeafIndex = uint256(2) ** _treeDepths.userStateTreeDepth - 1;
+        require(_maxValues.maxAttesters <= USTMaxLeafIndex, "Unirep: invalid maxAttesters value");
+        maxAttesters = _maxValues.maxAttesters;
 
         // Calculate and store the empty user state tree root. This value must
         // be set before we compute empty global state tree root later
@@ -200,9 +183,6 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
         emptyGlobalStateTreeRoot = calcEmptyGlobalStateTreeRoot(_treeDepths.globalStateTreeDepth);
 
         attestingFee = _attestingFee;
-
-         // Set default reputation nullifier
-        zeroNullifier = hash5([uint256(0),uint256(0),uint256(0),uint256(0),uint256(0)]);
     }
 
     /*
@@ -212,7 +192,7 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
      */
     function userSignUp(uint256 _identityCommitment) external {
         require(hasUserSignedUp[_identityCommitment] == false, "Unirep: the user has already signed up");
-        require(numUserSignUps < maxUsers, "Unirep: maximum number of signups reached");
+        require(numUserSignUps < maxUsers, "Unirep: maximum number of user signups reached");
         
         uint256 defaultUserStateRoot = emptyUserStateRoot;
         uint256 attesterId = attesters[msg.sender];
@@ -264,6 +244,7 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
      */
     function attesterSignUp() external {
         require(attesters[msg.sender] == 0, "Unirep: attester has already signed up");
+        require(nextAttesterId < maxAttesters, "Unirep: maximum number of attester signups reached");
 
         attesters[msg.sender] = nextAttesterId;
         nextAttesterId ++;
@@ -276,6 +257,7 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
      */
     function attesterSignUpViaRelayer(address attester, bytes calldata signature) external {
         require(attesters[attester] == 0, "Unirep: attester has already signed up");
+        require(nextAttesterId < maxAttesters, "Unirep: maximum number of attester signups reached");
         verifySignature(attester, signature);
 
         attesters[attester] = nextAttesterId;
@@ -296,21 +278,19 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
      * An attester submit the attestation with a reputation proof
      * @param attestation The attestation that the attester wants to send to the epoch key
      * @param epochKey The attester wants to send attestation to
+     * @param epochKeyProofData The epoch key proof and the public signals 
      */
-    function submitAttestation(Attestation calldata attestation, uint256 epochKey) external payable {
+    function submitAttestation(Attestation calldata attestation, uint256 epochKey, EpochKeyProofRelated calldata epochKeyProofData) external payable {
         require(attesters[msg.sender] > 0, "Unirep: attester has not signed up yet");
         require(attesters[msg.sender] == attestation.attesterId, "Unirep: mismatched attesterId");
-        require(isEpochKeyHashChainSealed[epochKey] == false, "Unirep: hash chain of this epoch key has been sealed");
+        // require(isEpochKeyHashChainSealed[epochKey] == false, "Unirep: hash chain of this epoch key has been sealed");
         require(msg.value == attestingFee, "Unirep: no attesting fee or incorrect amount");
-
-        // Before attesting to a given epoch key, an attester must
-        // verify validity of the epoch key using `verifyEpochKeyValidity` function.
 
         // Add to the cumulated attesting fee
         collectedAttestingFee = collectedAttestingFee.add(msg.value);
 
         // Process attestation
-        sealHashChain(msg.sender, attestation, epochKey);
+        emitAttestationEvent(msg.sender, attestation, epochKey, epochKeyProofData);
     }
 
     /*
@@ -319,120 +299,111 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
      * @param signature The signature of the attester
      * @param attestation The attestation including positive reputation, negative reputation or graffiti
      * @param epochKey The attester wants to send attestation to
+     * @param epochKeyProofData The epoch key proof and the public signals 
      */
     function submitAttestationViaRelayer(
         address attester,
         bytes calldata signature,
         Attestation calldata attestation,
-        uint256 epochKey
+        uint256 epochKey,
+        EpochKeyProofRelated calldata epochKeyProofData
     ) external payable {
         verifySignature(attester, signature);
         require(attesters[attester] > 0, "Unirep: attester has not signed up yet");
         require(attesters[attester] == attestation.attesterId, "Unirep: mismatched attesterId");
-        require(isEpochKeyHashChainSealed[epochKey] == false, "Unirep: hash chain of this epoch key has been sealed");
+        // require(isEpochKeyHashChainSealed[epochKey] == false, "Unirep: hash chain of this epoch key has been sealed");
         require(msg.value == attestingFee, "Unirep: no attesting fee or incorrect amount");
-
-        // Before attesting to a given epoch key, an attester must
-        // verify validity of the epoch key using `verifyEpochKeyValidity` function.
 
         // Add to the cumulated attesting fee
         collectedAttestingFee = collectedAttestingFee.add(msg.value);
 
         // Process attestation
-        sealHashChain(attester, attestation, epochKey);
+        emitAttestationEvent(attester, attestation, epochKey, epochKeyProofData);
     }
 
-    function sealHashChain(address attester, Attestation calldata attestation, uint256 epochKey) internal {
-        // Add the epoch key to epoch key list of current epoch
-        // if it is been attested to the first time.
-        uint256 index;
-        if(epochKeyHashchain[epochKey] == 0) {
-            index = epochKeys[currentEpoch].numKeys;
-            epochKeys[currentEpoch].keys[index] = epochKey;
-            epochKeys[currentEpoch].numKeys ++;
-        }
+    function emitAttestationEvent(address attester, Attestation calldata attestation, uint256 epochKey, EpochKeyProofRelated calldata epochKeyProofData) internal {
 
         // Validate attestation data
         require(attestation.posRep < SNARK_SCALAR_FIELD, "Unirep: invalid attestation posRep");
         require(attestation.negRep < SNARK_SCALAR_FIELD, "Unirep: invalid attestation negRep");
         require(attestation.graffiti < SNARK_SCALAR_FIELD, "Unirep: invalid attestation graffiti");
         require(attestation.signUp == 1 || attestation.signUp == 0, "Unirep: invalid attestation signUp");
-        
-        epochKeyHashchain[epochKey] = hashLeftRight(
-            hashAttestation(attestation),
-            epochKeyHashchain[epochKey]
-        );
 
+        // Emit epoch key proof with attestation submitted event
+        // And user can verify if the epoch key is valid or not
         emit Sequencer("AttestationSubmitted");
         emit AttestationSubmitted(
             currentEpoch,
             epochKey,
             attester,
-            attestation
+            attestationIndex,
+            attestation,
+            epochKeyProofData
         );
+
+        attestationIndex++;
     }
 
-    function submitReputationNullifiers(
+    /*
+     * A user spend reputation via an attester, the non-zero nullifiers will be processed as a negative attestation
+     * @param _repNullifiers The reputation nullifiers that the user submitted to avoid double spending
+     * @param _epochKey The epoch key of the user to receive negative attestation
+     * @param _globalStateTree The global state tree root of the reputation proof
+     * @param _minRep The minimum reputation that a user wants to prove that he has at least
+     * @param _proveGraffiti The flag to indicate if the user wants to prove the pre-image of the graffiti
+     * @param _graffitiPreImage The graffiti preimage that the user wants to prove
+     * @param _proof The reputatiaon proof
+     */
+    function spendReputation(
         uint256[] calldata _repNullifiers,
-        uint256 _epoch,
         uint256 _epochKey,
         uint256 _globalStateTree,
-        uint256 _attesterId,
-        uint256 _proveReputationAmount,
         uint256 _minRep,
         uint256 _proveGraffiti,
         uint256 _graffitiPreImage,
-        uint256[8] calldata _proof) external {
-        require(_epoch == currentEpoch, "Unirep: should submit a proof which matches current epoch");
-        require(_repNullifiers.length == maxReputationBudget, "Unirep: invalid number of rep nullifiers");
-        require(_proveReputationAmount <= maxReputationBudget, "Unirep: invalid number of proving reputation amount");
-        require(_attesterId < nextAttesterId, "Unirep: invalid attesterId");
+        uint256[8] calldata _proof) external payable {
+        require(attesters[msg.sender] > 0, "Unirep: attester has not signed up yet");
+        require(msg.value == attestingFee, "Unirep: no attesting fee or incorrect amount");
+        require(_repNullifiers.length == maxReputationBudget, "Unirep: invalid number of reputation nullifiers");
+
+        // Emit reputation proof with reputation nullifiers submitted event
+        // And user can verify if the nullifiers is valid or not
         ReputationProofRelated memory reputationProofData;
-        reputationProofData.epochKey = _epochKey;
         reputationProofData.globalStateTree = _globalStateTree;
-        reputationProofData.attesterId = _attesterId;
-        reputationProofData.proveReputationAmount = _proveReputationAmount;
         reputationProofData.minRep = _minRep;
         reputationProofData.proveGraffiti = _proveGraffiti;
         reputationProofData.graffitiPreImage = _graffitiPreImage;
         reputationProofData.proof = _proof;
 
+        // Add to the cumulated attesting fee
+        collectedAttestingFee = collectedAttestingFee.add(msg.value);
+
         emit Sequencer("ReputationNullifierSubmitted");
         emit ReputationNullifierSubmitted(
-            _epoch,
+            currentEpoch,
+            _epochKey,
+            msg.sender,
+            attestationIndex,
             reputationProofData,
             _repNullifiers
         );
+
+        attestationIndex++;
     }
 
-    function beginEpochTransition(uint256 numEpochKeysToSeal) external {
+    function beginEpochTransition() external {
         uint256 initGas = gasleft();
 
         require(block.timestamp - latestEpochTransitionTime >= epochLength, "Unirep: epoch not yet ended");
 
-        uint256 epochKey;
-        uint256 startKeyIndex = epochKeys[currentEpoch].numSealedKeys;
-        uint256 endKeyIndex = min(epochKeys[currentEpoch].numKeys, startKeyIndex.add(numEpochKeysToSeal));
-        for (uint i = startKeyIndex; i < endKeyIndex; i++) {
-            // Seal the hash chain of this epoch key
-            epochKey = epochKeys[currentEpoch].keys[i];
-            epochKeyHashchain[epochKey] = hashLeftRight(
-                1,
-                epochKeyHashchain[epochKey]
-            );
-            isEpochKeyHashChainSealed[epochKey] = true;
-        }
-        epochKeys[currentEpoch].numSealedKeys = endKeyIndex;
+        // Mark epoch transitioned as complete and increase currentEpoch
+        emit Sequencer("EpochEnded");
+        emit EpochEnded(currentEpoch);
 
-        // Mark epoch transitioned as complete if hash chain of all epoch keys are sealed
-        if(endKeyIndex == epochKeys[currentEpoch].numKeys) {
-            emit Sequencer("EpochEnded");
-            emit EpochEnded(currentEpoch);
-
-            latestEpochTransitionTime = block.timestamp;
-            currentEpoch ++;
-            nextGSTLeafIndex = 0;
-        }
+        latestEpochTransitionTime = block.timestamp;
+        currentEpoch ++;
+        nextGSTLeafIndex = 0;
+        attestationIndex = 0;
 
         uint256 gasUsed = initGas.sub(gasleft());
         epochTransitionCompensation[msg.sender] = epochTransitionCompensation[msg.sender].add(gasUsed.mul(tx.gasprice));
@@ -818,18 +789,6 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
         uint256 h = hashStateLeaf(stateLeaf);
 
         return computeEmptyRoot(_levels, h);
-    }
-
-    function getEpochTreeLeaves(uint256 epoch) external view returns (uint256[] memory epochKeyList, uint256[] memory epochKeyHashChainList) {
-        uint256 epochKey;
-        epochKeyList = new uint256[](epochKeys[epoch].numKeys);
-        epochKeyHashChainList = new uint256[](epochKeys[epoch].numKeys);
-        for (uint i = 0; i < epochKeys[epoch].numKeys; i++) {
-            // Seal the hash chain of this epoch key
-            epochKey = epochKeys[epoch].keys[i];
-            epochKeyList[i] = epochKey;
-            epochKeyHashChainList[i] = epochKeyHashchain[epochKey];
-        }
     }
 
     /*
