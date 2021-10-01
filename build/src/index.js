@@ -55,16 +55,18 @@ const deployUnirep = async (deployer, _treeDepths, _settings) => {
     UserSignUpVerifierContract = await UserSignUpVerifierFactory.deploy();
     await UserSignUpVerifierContract.deployTransaction.wait();
     console.log('Deploying Unirep');
-    let _maxUsers, _numEpochKeyNoncePerEpoch, _maxReputationBudget, _epochLength, _attestingFee;
+    let _maxUsers, _maxAttesters, _numEpochKeyNoncePerEpoch, _maxReputationBudget, _epochLength, _attestingFee;
     if (_settings) {
         _maxUsers = _settings.maxUsers;
-        _numEpochKeyNoncePerEpoch = _settings.numEpochKeyNoncePerEpoch;
+        _maxAttesters = _settings.maxAttesters,
+            _numEpochKeyNoncePerEpoch = _settings.numEpochKeyNoncePerEpoch;
         _maxReputationBudget = _settings.maxReputationBudget;
         _epochLength = _settings.epochLength;
         _attestingFee = _settings.attestingFee;
     }
     else {
         _maxUsers = config_1.maxUsers;
+        _maxAttesters = config_1.maxAttesters;
         _numEpochKeyNoncePerEpoch = config_1.numEpochKeyNoncePerEpoch;
         _maxReputationBudget = config_1.maxReputationBudget,
             _epochLength = config_1.epochLength;
@@ -78,7 +80,8 @@ const deployUnirep = async (deployer, _treeDepths, _settings) => {
         }
     });
     const c = await f.deploy(_treeDepths, {
-        "maxUsers": _maxUsers
+        "maxUsers": _maxUsers,
+        "maxAttesters": _maxAttesters,
     }, EpochKeyValidityVerifierContract.address, StartTransitionVerifierContract.address, ProcessAttestationsVerifierContract.address, UserStateTransitionVerifierContract.address, ReputationVerifierContract.address, UserSignUpVerifierContract.address, _numEpochKeyNoncePerEpoch, _maxReputationBudget, _epochLength, _attestingFee, {
         gasLimit: 9000000,
     });

@@ -24,6 +24,7 @@ describe('Signup', () => {
         // Set maxUsers to testMaxUser
         const _settings = {
             maxUsers: testMaxUser,
+            maxAttesters: testMaxUser,
             numEpochKeyNoncePerEpoch: numEpochKeyNoncePerEpoch,
             maxReputationBudget: maxReputationBudget,
             epochLength: epochLength,
@@ -91,7 +92,7 @@ describe('Signup', () => {
                 expect(receipt.status).equal(1)
             }
             await expect(unirepContract.userSignUp(genIdentityCommitment(genIdentity())))
-                .to.be.revertedWith('Unirep: maximum number of signups reached')
+                .to.be.revertedWith('Unirep: maximum number of user signups reached')
         })
     })
 
@@ -150,6 +151,23 @@ describe('Signup', () => {
 
             await expect(unirepContract.attesterSignUpViaRelayer(attester2Address, attester2Sig))
                 .to.be.revertedWith('Unirep: attester has already signed up')
+        })
+
+        it('sign up should fail if max capacity reached', async () => {
+            for (let i = 3; i < testMaxUser; i++) {
+                attester = accounts[i]
+                attesterAddress = await attester.getAddress()
+                unirepContractCalledByAttester = await hardhatEthers.getContractAt(Unirep.abi, unirepContract.address, attester)
+                const tx = await unirepContractCalledByAttester.attesterSignUp()
+                const receipt = await tx.wait()
+
+                expect(receipt.status).equal(1)
+            }
+            attester = accounts[5]
+            attesterAddress = await attester.getAddress()
+            unirepContractCalledByAttester = await hardhatEthers.getContractAt(Unirep.abi, unirepContract.address, attester)
+            await expect(unirepContractCalledByAttester.attesterSignUp())
+                .to.be.revertedWith('Unirep: maximum number of attester signups reached')
         })
     })
 })

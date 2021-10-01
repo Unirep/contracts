@@ -4,7 +4,7 @@ import { expect } from "chai"
 import { genRandomSalt, hashLeftRight, hash5, stringifyBigInts, genIdentity, genIdentityCommitment } from '@unirep/crypto'
 import { genProofAndPublicSignals, verifyProof } from '@unirep/circuits'
 
-import { attestingFee, epochLength, maxUsers, numEpochKeyNoncePerEpoch, circuitUserStateTreeDepth, maxReputationBudget } from '../config'
+import { attestingFee, epochLength, maxUsers, numEpochKeyNoncePerEpoch, circuitUserStateTreeDepth, maxReputationBudget, maxAttesters } from '../config'
 import { getTreeDepthsForTesting, UnirepState, UserState, genNewSMT } from './utils'
 import { deployUnirep } from '../src'
 
@@ -34,6 +34,7 @@ describe('Airdrop', function () {
         const _treeDepths = getTreeDepthsForTesting()
         const _settings = {
             maxUsers: maxUsers,
+            maxAttesters: maxAttesters,
             numEpochKeyNoncePerEpoch: numEpochKeyNoncePerEpoch,
             maxReputationBudget: maxReputationBudget,
             epochLength: epochLength,
