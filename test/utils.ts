@@ -104,7 +104,7 @@ class Reputation implements IReputation {
         if(_graffiti != BigInt(0)){
             this.graffiti = _graffiti
         }
-        this.signUp = _signUp
+        this.signUp = this.signUp || _signUp
         return this
     }
 
@@ -698,7 +698,7 @@ class UserState {
         for (let i = 0; i < fromNonces.length; i++) {
             const startIdx = this.numAttestationsPerProof * i
             const endIdx = this.numAttestationsPerProof * (i+1)
-            if(fromNonces[i] == toNonces[i] && intermediateUserStateTreeRoots[startIdx] == intermediateUserStateTreeRoots[endIdx]) continue
+            // if(fromNonces[i] == toNonces[i] && intermediateUserStateTreeRoots[startIdx] == intermediateUserStateTreeRoots[endIdx]) continue
             processAttestationProofs.push(stringifyBigInts({
                 epoch: fromEpoch,
                 from_nonce: fromNonces[i],

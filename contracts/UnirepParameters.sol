@@ -25,22 +25,37 @@ contract UnirepParameters {
 
     struct EpochKeyProofRelated{
         uint256 fromGlobalStateTree;
+        uint256 epoch;
+        uint256 epochKey;
+        uint256[8] proof;
+    }
+
+    struct SignUpProofRelated{
+        uint256 epoch;
+        uint256 epochKey;
+        uint256 globalStateTree;
+        uint256 attesterId;
         uint256[8] proof;
     }
 
     struct UserTransitionedRelated{
-        uint256 fromEpoch;
-        uint256 fromGlobalStateTree;
-        uint256 fromEpochTree;
         uint256 newGlobalStateTreeLeaf;
-        uint256[] blindedUserStates;
-        uint256[] blindedHashChains;
         uint256[] epkNullifiers;
+        uint256 transitionFromEpoch;
+        uint256[] blindedUserStates;
+        uint256 fromGlobalStateTree;
+        uint256[] blindedHashChains;
+        uint256 fromEpochTree;
         uint256[8] proof;
     }
 
     struct ReputationProofRelated{
+        uint256[] repNullifiers;
+        uint256 epoch;
+        uint256 epochKey;
         uint256 globalStateTree;
+        uint256 attesterId;
+        uint256 proveReputationAmount;
         uint256 minRep;
         uint256 proveGraffiti;
         uint256 graffitiPreImage;
