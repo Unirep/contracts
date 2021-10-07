@@ -107,7 +107,7 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
     // This event is emitted when a user first signs up in Unirep
     event UserSignUp(
         uint256 indexed _proofIndex,
-        uint256 _hashedLeaf,
+        uint256 _identityCommitment,
         uint256 _attesterId,
         uint256 _airdropAmount
     );
