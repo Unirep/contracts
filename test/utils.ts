@@ -897,6 +897,33 @@ const genEpochKeyNullifier = (identityNullifier: SnarkBigInt, epoch: number, non
     return hash5([EPOCH_KEY_NULLIFIER_DOMAIN, identityNullifier, BigInt(epoch), BigInt(nonce), BigInt(0)])
 }
 
+const verifyProcessAttestationEvents = async(unirepContract: ethers.Contract, startBlindedUserState: BigInt | string, currentBlindedUserState: BigInt | string): Promise<boolean> => {
+
+    const processAttestationFilter = unirepContract.filters.ProcessedAttestationsProof(currentBlindedUserState)
+    const processAttestationEvents = await unirepContract.queryFilter(processAttestationFilter)
+    if(processAttestationEvents.length == 0) return false
+
+    let returnValue = false
+    for(const event of processAttestationEvents){
+        const args = event?.args
+        const isValid = await unirepContract.verifyProcessAttestationProof(
+            args?._outputBlindedUserState,
+            args?._outputBlindedHashChain,
+            args?._inputBlindedUserState,
+            args?._proof
+        )
+        if(!isValid) continue
+        if (BigInt(args?._inputBlindedUserState) == startBlindedUserState) {
+            returnValue = true
+            break
+        }
+        else {
+            returnValue = returnValue || await verifyProcessAttestationEvents(unirepContract, startBlindedUserState, args?._inputBlindedUserState)
+        }
+    }
+    return returnValue
+}
+
 export {
     IEpochTreeLeaf,
     Attestation,
@@ -914,4 +941,5 @@ export {
     toCompleteHexString,
     genEpochKey,
     genEpochKeyNullifier,
+    verifyProcessAttestationEvents,
 }

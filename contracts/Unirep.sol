@@ -291,7 +291,7 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
      * @param attestation The attestation that the attester wants to send to the epoch key
      * @param epochKeyProofData The epoch key and its epoch key proof and public signals 
      */
-    function submitAttestation(Attestation calldata attestation, EpochKeyProofRelated calldata epochKeyProofData) external payable {
+    function submitAttestation(Attestation calldata attestation, EpochKeyProofRelated memory epochKeyProofData) external payable {
         require(attesters[msg.sender] > 0, "Unirep: attester has not signed up yet");
         require(attesters[msg.sender] == attestation.attesterId, "Unirep: mismatched attesterId");
         require(msg.value == attestingFee, "Unirep: no attesting fee or incorrect amount");
@@ -319,7 +319,7 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
         address attester,
         bytes calldata signature,
         Attestation calldata attestation,
-        EpochKeyProofRelated calldata epochKeyProofData
+        EpochKeyProofRelated memory epochKeyProofData
     ) external payable {
         verifySignature(attester, signature);
         require(attesters[attester] > 0, "Unirep: attester has not signed up yet");
@@ -343,7 +343,7 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
      * @param attestation The attestation that the attester wants to send to the epoch key
      * @param signUpProofData The epoch key and its proof and the public signals 
      */
-    function airdropEpochKey(SignUpProofRelated calldata signUpProofData) external payable {
+    function airdropEpochKey(SignUpProofRelated memory signUpProofData) external payable {
         require(attesters[msg.sender] > 0, "Unirep: attester has not signed up yet");
         require(attesters[msg.sender] == signUpProofData.attesterId, "Unirep: mismatched attesterId");
         require(msg.value == attestingFee, "Unirep: no attesting fee or incorrect amount");
@@ -375,7 +375,7 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
      * @param _graffitiPreImage The graffiti preimage that the user wants to prove
      * @param _proof The reputatiaon proof
      */
-    function spendReputation(ReputationProofRelated calldata reputationProofData) external payable {
+    function spendReputation(ReputationProofRelated memory reputationProofData) external payable {
         require(attesters[msg.sender] > 0, "Unirep: attester has not signed up yet");
         require(attesters[msg.sender] == reputationProofData.attesterId, "Unirep: mismatched attesterId");
         require(msg.value == attestingFee, "Unirep: no attesting fee or incorrect amount");
@@ -455,7 +455,7 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
         emit ProcessedAttestationsProof(_outputBlindedUserState, _outputBlindedHashChain, _inputBlindedUserState, _proof);
     }
 
-    function updateUserStateRoot(UserTransitionedRelated calldata userTransitionedData) external {
+    function updateUserStateRoot(UserTransitionedRelated memory userTransitionedData) external {
         // NOTE: this impl assumes all attestations are processed in a single snark.
         require(userTransitionedData.transitionFromEpoch < currentEpoch, "Can not transition from epoch that's greater or equal to current epoch");
         require(userTransitionedData.epkNullifiers.length == numEpochKeyNoncePerEpoch, "Unirep: invalid number of epk nullifiers");
@@ -473,7 +473,7 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
         uint256 _globalStateTree,
         uint256 _epoch,
         uint256 _epochKey,
-        uint256[8] memory _proof) public view returns (bool) {
+        uint256[8] calldata _proof) external view returns (bool) {
         // Before attesting to a given epoch key, an attester must verify validity of the epoch key:
         // 1. user has signed up
         // 2. nonce is no greater than numEpochKeyNoncePerEpoch
@@ -512,7 +512,7 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
         uint256 _blindedUserState,
         uint256 _blindedHashChain,
         uint256 _GSTRoot,
-        uint256[8] memory _proof) public view returns (bool) {
+        uint256[8] calldata _proof) external view returns (bool) {
 
         uint256[] memory _publicSignals = new uint256[](4);
         _publicSignals[0] = _blindedUserState;
@@ -546,7 +546,7 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
         uint256 _outputBlindedUserState,
         uint256 _outputBlindedHashChain,
         uint256 _inputBlindedUserState,
-        uint256[8] memory _proof) public view returns (bool) {
+        uint256[8] calldata _proof) external view returns (bool) {
 
         uint256[] memory _publicSignals = new uint256[](4);
         _publicSignals[0] = _outputBlindedUserState;
@@ -637,7 +637,7 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
         uint256 _minRep,
         uint256 _proveGraffiti,
         uint256 _graffitiPreImage,
-        uint256[8] calldata _proof) public view returns (bool) {
+        uint256[8] calldata _proof) external view returns (bool) {
         // User prove his reputation by an attester:
         // 1. User exists in GST
         // 2. It is the latest state user transition to

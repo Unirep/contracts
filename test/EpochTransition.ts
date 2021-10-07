@@ -5,7 +5,7 @@ import { genRandomSalt, hashLeftRight, IncrementalQuinTree, genIdentity, genIden
 import { formatProofForVerifierContract, genProofAndPublicSignals, verifyProof } from '@unirep/circuits'
 
 import { attestingFee, epochLength, maxReputationBudget, numEpochKeyNoncePerEpoch } from '../config'
-import { computeEmptyUserStateRoot, genEpochKey, getTreeDepthsForTesting, Attestation, IEpochTreeLeaf, UnirepState, UserState } from './utils'
+import { computeEmptyUserStateRoot, genEpochKey, getTreeDepthsForTesting, Attestation, IEpochTreeLeaf, UnirepState, UserState, verifyProcessAttestationEvents } from './utils'
 import { deployUnirep } from '../src'
 import Unirep from "../artifacts/contracts/Unirep.sol/Unirep.json"
 
@@ -261,6 +261,9 @@ describe('Epoch Transition', function () {
             GSTreeRoot,
             formatProofForVerifierContract(results['proof']),
         )
+        console.log('start transition')
+        console.log('start blinded user state: ', blindedUserState)
+        console.log('start blinded hash chain: ', blindedHashChain)
         const receipt = await tx.wait()
         expect(receipt.status, 'Submit user state transition proof failed').to.equal(1)
         console.log("Gas cost of submit a start transition proof:", receipt.gasUsed.toString())
@@ -282,6 +285,9 @@ describe('Epoch Transition', function () {
                 inputBlindedUserState,
                 formatProofForVerifierContract(results['proof']),
             )
+            console.log('input blinded user state: ', inputBlindedUserState)
+            console.log('output blinded user state: ', outputBlindedUserState)
+            console.log('output blinded hash chain: ', outputBlindedHashChain)
             const receipt = await tx.wait()
             expect(receipt.status, 'Submit process attestations proof failed').to.equal(1)
             console.log("Gas cost of submit a process attestations proof:", receipt.gasUsed.toString())
@@ -339,6 +345,52 @@ describe('Epoch Transition', function () {
         expect(newGSTLeaf, 'Computed new GST leaf should match').to.equal(newState.newGSTLeaf.toString())
         userState.transition(newState.newUSTLeaves)
         unirepState.userStateTransition(epoch_, BigInt(newGSTLeaf), epkNullifiers)
+    })
+
+    it('verify user state transition proofs should succeed', async() => {
+        const currentEpoch = await unirepContract.currentEpoch()
+        const newLeafFilter = unirepContract.filters.NewGSTLeafInserted(currentEpoch)
+        const newLeafEvents = await unirepContract.queryFilter(newLeafFilter)
+        expect(newLeafEvents.length).to.equal(1)
+
+        const proofIndex = newLeafEvents[0]?.args?._proofIndex
+        const transitionFilter = unirepContract.filters.UserStateTransitionProof(proofIndex)
+        const transitionEvents = await unirepContract.queryFilter(transitionFilter)
+        expect(transitionEvents.length, `Transition event is not found`).to.equal(1)
+
+        // proof index is supposed to be unique, therefore it should be only one event found
+        const transitionArgs = transitionEvents[0]?.args?.userTransitionedData
+        // backward verification
+        const isValid = await unirepContract.verifyUserStateTransition(
+            transitionArgs.newGlobalStateTreeLeaf,
+            transitionArgs.epkNullifiers,
+            transitionArgs.transitionFromEpoch,
+            transitionArgs.blindedUserStates,
+            transitionArgs.fromGlobalStateTree,
+            transitionArgs.blindedHashChains,
+            transitionArgs.fromEpochTree,
+            transitionArgs.proof,
+        )
+        expect(isValid, 'Verify user state transition on-chain failed').to.be.true
+
+        console.log('final proof: ')
+        console.log('user state starter: ', BigInt(transitionArgs.blindedUserStates[0]))
+        console.log('user state result: ', BigInt(transitionArgs.blindedUserStates[1]))
+        const isProcessAttestationValid = await verifyProcessAttestationEvents(unirepContract, transitionArgs.blindedUserStates[0], transitionArgs.blindedUserStates[1])
+        expect(isProcessAttestationValid, 'Verify process attestations proofs on-chain failed').to.be.true
+
+        const startTransitionFilter = unirepContract.filters.StartedTransitionProof(transitionArgs.blindedUserStates[0], null, transitionArgs.fromGlobalStateTree)
+        const startTransitionEvents = await unirepContract.queryFilter(startTransitionFilter)
+        expect(startTransitionEvents.length, 'Start transitino proof not found').not.equal(0)
+
+        const startTransitionArgs = startTransitionEvents[0]?.args
+        const isStartTransitionProofValid = await unirepContract.verifyStartTransitionProof(
+            startTransitionArgs?._blindedUserState,
+            startTransitionArgs?._blindedHashChain,
+            startTransitionArgs?._GSTRoot,
+            startTransitionArgs?._proof,
+        )
+        expect(isStartTransitionProofValid, 'Verify start user state transition proof on-chain failed').to.be.true
     })
 
     it('epoch transition with no attestations and epoch keys should also succeed', async () => {
