@@ -138,7 +138,7 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
     event ProcessedAttestationsProof(
         uint256 indexed _outputBlindedUserState,
         uint256 indexed _outputBlindedHashChain,
-        uint256 _inputBlindedUserState,
+        uint256 indexed _inputBlindedUserState,
         uint256[8] _proof
     );
 
