@@ -24,7 +24,7 @@ contract UnirepParameters {
     }
 
     struct EpochKeyProofRelated{
-        uint256 fromGlobalStateTree;
+        uint256 globalStateTree;
         uint256 epoch;
         uint256 epochKey;
         uint256[8] proof;

@@ -16,7 +16,7 @@ import { UserStateTransitionVerifier } from './UserStateTransitionVerifier.sol';
 import { ReputationVerifier } from './ReputationVerifier.sol';
 import { UserSignUpVerifier } from './UserSignUpVerifier.sol';
 
-contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
+contract Unirep is DomainObjs, ComputeRoot {
     using SafeMath for uint256;
 
     // A nothing-up-my-sleeve zero value
@@ -57,8 +57,12 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
 
     uint256 public numUserSignUps = 0;
 
-    // The index of all proofs
-    uint256 internal proofIndex = 0;
+    // The index of all proofs, 
+    // 0 is reserved for index not found in getProofIndex
+    uint256 internal proofIndex = 1;
+
+    // Mapping of proof nullifiers and the proof index
+    mapping(bytes32 => uint256) public getProofIndex;
 
     mapping(uint256 => bool) public hasUserSignedUp;
 
@@ -129,22 +133,25 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
     );
 
     event StartedTransitionProof(
+        uint256 indexed _proofIndex,
         uint256 indexed _blindedUserState,
-        uint256 indexed _blindedHashChain,
-        uint256 indexed _GSTRoot,
+        uint256 indexed _globalStateTree,
+        uint256 _blindedHashChain,
         uint256[8] _proof
     );
 
     event ProcessedAttestationsProof(
-        uint256 indexed _outputBlindedUserState,
-        uint256 indexed _outputBlindedHashChain,
+        uint256 indexed _proofIndex,
         uint256 indexed _inputBlindedUserState,
+        uint256 _outputBlindedUserState,
+        uint256 _outputBlindedHashChain,
         uint256[8] _proof
     );
 
     event UserStateTransitionProof(
         uint256 indexed _proofIndex,
-        UserTransitionedRelated userTransitionedData
+        UserTransitionedRelated userTransitionedData,
+        uint256[] _proofIndexRecords
     );
 
     constructor(
@@ -291,21 +298,17 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
      * @param attestation The attestation that the attester wants to send to the epoch key
      * @param epochKeyProofData The epoch key and its epoch key proof and public signals 
      */
-    function submitAttestation(Attestation calldata attestation, EpochKeyProofRelated memory epochKeyProofData) external payable {
+    function submitAttestation(Attestation calldata attestation, uint256 epochKey, uint256 _proofIndex) external payable {
         require(attesters[msg.sender] > 0, "Unirep: attester has not signed up yet");
         require(attesters[msg.sender] == attestation.attesterId, "Unirep: mismatched attesterId");
         require(msg.value == attestingFee, "Unirep: no attesting fee or incorrect amount");
-        require(epochKeyProofData.epoch == currentEpoch, "Unirep: submit an epoch key with incorrect epoch");
+        require(_proofIndex < proofIndex, "Unirep: invalid proof index");
 
         // Add to the cumulated attesting fee
         collectedAttestingFee = collectedAttestingFee.add(msg.value);
 
-        // emit proof event
-        emit EpochKeyProof(proofIndex, epochKeyProofData);
          // Process attestation
-        emitAttestationEvent(msg.sender, attestation, epochKeyProofData.epochKey, proofIndex);
-        
-        proofIndex ++;
+        emitAttestationEvent(msg.sender, attestation, epochKey, _proofIndex);
     }
 
     /*
@@ -319,22 +322,35 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
         address attester,
         bytes calldata signature,
         Attestation calldata attestation,
-        EpochKeyProofRelated memory epochKeyProofData
+        uint256 epochKey,
+        uint256 _proofIndex
     ) external payable {
         verifySignature(attester, signature);
         require(attesters[attester] > 0, "Unirep: attester has not signed up yet");
         require(attesters[attester] == attestation.attesterId, "Unirep: mismatched attesterId");
         require(msg.value == attestingFee, "Unirep: no attesting fee or incorrect amount");
-        require(epochKeyProofData.epoch == currentEpoch, "Unirep: submit an epoch key with incorrect epoch");
+        require(_proofIndex < proofIndex, "Unirep: invalid proof index");
 
         // Add to the cumulated attesting fee
         collectedAttestingFee = collectedAttestingFee.add(msg.value);
 
-        // emit proof event
-        emit EpochKeyProof(proofIndex, epochKeyProofData);
         // Process attestation
-        emitAttestationEvent(attester, attestation, epochKeyProofData.epochKey, proofIndex);
-        
+        emitAttestationEvent(attester, attestation, epochKey, _proofIndex);
+    }
+
+    /*
+     * A user should submit an epoch key proof and get a proof index
+     * @param epochKeyProofData The epoch key proof and the public signals 
+     */
+    function submitEpochKeyProof(EpochKeyProofRelated memory epochKeyProofData) external {
+        bytes32 proofNullifier = hashEpochKeyProof(epochKeyProofData);
+        require(getProofIndex[proofNullifier] == 0, "Unirep: the proof has been submitted before");
+        require(epochKeyProofData.epoch == currentEpoch, "Unirep: submit an epoch key proof with incorrect epoch");
+
+        // emit proof event
+        uint256 _proofIndex = proofIndex;
+        emit EpochKeyProof(_proofIndex, epochKeyProofData);
+        getProofIndex[proofNullifier] = _proofIndex;
         proofIndex ++;
     }
 
@@ -344,6 +360,8 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
      * @param signUpProofData The epoch key and its proof and the public signals 
      */
     function airdropEpochKey(SignUpProofRelated memory signUpProofData) external payable {
+        bytes32 proofNullifier = hashSignUpProof(signUpProofData);
+        require(getProofIndex[proofNullifier] == 0, "Unirep: the proof has been submitted before");
         require(attesters[msg.sender] > 0, "Unirep: attester has not signed up yet");
         require(attesters[msg.sender] == signUpProofData.attesterId, "Unirep: mismatched attesterId");
         require(msg.value == attestingFee, "Unirep: no attesting fee or incorrect amount");
@@ -358,10 +376,12 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
         attestation.posRep = airdropAmount[msg.sender];
         attestation.signUp = 1;
 
+        uint256 _proofIndex = proofIndex;
         // emit proof event
-        emit UserSignedUpProof(proofIndex, signUpProofData);
+        emit UserSignedUpProof(_proofIndex, signUpProofData);
         // Process attestation
-        emitAttestationEvent(msg.sender, attestation, signUpProofData.epochKey, proofIndex);
+        emitAttestationEvent(msg.sender, attestation, signUpProofData.epochKey, _proofIndex);
+        getProofIndex[proofNullifier] = _proofIndex;
         proofIndex ++;
     }
 
@@ -376,6 +396,8 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
      * @param _proof The reputatiaon proof
      */
     function spendReputation(ReputationProofRelated memory reputationProofData) external payable {
+        bytes32 proofNullifier = hashReputationProof(reputationProofData);
+        require(getProofIndex[proofNullifier] == 0, "Unirep: the proof has been submitted before");
         require(attesters[msg.sender] > 0, "Unirep: attester has not signed up yet");
         require(attesters[msg.sender] == reputationProofData.attesterId, "Unirep: mismatched attesterId");
         require(msg.value == attestingFee, "Unirep: no attesting fee or incorrect amount");
@@ -391,13 +413,15 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
         attestation.attesterId = attesters[msg.sender];
         attestation.negRep = reputationProofData.proveReputationAmount;
 
+        uint256 _proofIndex = proofIndex;
         // emit proof event
         emit ReputationNullifierProof(
-            proofIndex, 
+            _proofIndex, 
             reputationProofData
         );
         // Process attestation
-        emitAttestationEvent(msg.sender, attestation, reputationProofData.epochKey, proofIndex);
+        emitAttestationEvent(msg.sender, attestation, reputationProofData.epochKey, _proofIndex);
+        getProofIndex[proofNullifier] = _proofIndex;
         proofIndex ++;
     }
 
@@ -440,10 +464,16 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
     function startUserStateTransition(
         uint256 _blindedUserState,
         uint256 _blindedHashChain,
-        uint256 _GSTRoot,
+        uint256 _globalStateTree,
         uint256[8] calldata _proof
     ) external {
-        emit StartedTransitionProof(_blindedUserState, _blindedHashChain, _GSTRoot, _proof);
+        bytes32 proofNullifier = hashStartTransitionProof(_blindedUserState, _blindedHashChain, _globalStateTree, _proof);
+        require(getProofIndex[proofNullifier] == 0, "Unirep: the proof has been submitted before");
+        
+        uint256 _proofIndex = proofIndex;
+        emit StartedTransitionProof(_proofIndex, _blindedUserState, _globalStateTree, _blindedHashChain, _proof);
+        getProofIndex[proofNullifier] = _proofIndex;
+        proofIndex ++;
     }
 
     function processAttestations(
@@ -452,20 +482,30 @@ contract Unirep is DomainObjs, ComputeRoot, UnirepParameters {
         uint256 _inputBlindedUserState,
         uint256[8] calldata _proof
     ) external {
-        emit ProcessedAttestationsProof(_outputBlindedUserState, _outputBlindedHashChain, _inputBlindedUserState, _proof);
+        bytes32 proofNullifier = hashProcessAttestationsProof(_outputBlindedUserState, _outputBlindedHashChain, _inputBlindedUserState, _proof);
+        require(getProofIndex[proofNullifier] == 0, "Unirep: the proof has been submitted before");
+
+        uint256 _proofIndex = proofIndex;
+        emit ProcessedAttestationsProof(_proofIndex, _inputBlindedUserState, _outputBlindedUserState, _outputBlindedHashChain, _proof);
+        getProofIndex[proofNullifier] = _proofIndex;
+        proofIndex ++;
     }
 
-    function updateUserStateRoot(UserTransitionedRelated memory userTransitionedData) external {
+    function updateUserStateRoot(UserTransitionedRelated memory userTransitionedData, uint256[] memory proofIndexRecords) external {
+        bytes32 proofNullifier = hashUserStateTransitionProof(userTransitionedData);
+        require(getProofIndex[proofNullifier] == 0, "Unirep: the proof has been submitted before");
         // NOTE: this impl assumes all attestations are processed in a single snark.
         require(userTransitionedData.transitionFromEpoch < currentEpoch, "Can not transition from epoch that's greater or equal to current epoch");
         require(userTransitionedData.epkNullifiers.length == numEpochKeyNoncePerEpoch, "Unirep: invalid number of epk nullifiers");
         require(userTransitionedData.blindedUserStates.length == 2, "Unirep: invalid number of blinded user states");
         require(userTransitionedData.blindedHashChains.length == numEpochKeyNoncePerEpoch, "Unirep: invalid number of blinded hash chains");
         
+        uint256 _proofIndex = proofIndex;
         emit Sequencer(currentEpoch, "NewGSTLeafInserted");
-        emit UserStateTransitionProof(proofIndex, userTransitionedData);
-        emit NewGSTLeafInserted(currentEpoch, userTransitionedData.newGlobalStateTreeLeaf, proofIndex);
+        emit UserStateTransitionProof(_proofIndex, userTransitionedData, proofIndexRecords);
+        emit NewGSTLeafInserted(currentEpoch, userTransitionedData.newGlobalStateTreeLeaf, _proofIndex);
 
+        getProofIndex[proofNullifier] = _proofIndex;
         proofIndex ++;
     }
 
