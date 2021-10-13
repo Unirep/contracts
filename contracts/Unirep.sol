@@ -118,17 +118,23 @@ contract Unirep is DomainObjs, ComputeRoot {
 
     event EpochKeyProof(
         uint256 indexed _proofIndex,
+        uint256 indexed _epoch,
+        uint256 indexed _epochKey,
         EpochKeyProofRelated epochKeyProofData
     );
 
     event ReputationNullifierProof(
         uint256 indexed _proofIndex,
+        uint256 indexed _epoch,
+        uint256 indexed _epochKey,
         ReputationProofRelated reputationProofData
     );
 
     // This event is emitted if a user wants to prove that he has a signup flag in an attester ID
     event UserSignedUpProof(
         uint256 indexed _proofIndex,
+        uint256 indexed _epoch,
+        uint256 indexed _epochKey,
         SignUpProofRelated signUpProofData
     );
 
@@ -349,7 +355,7 @@ contract Unirep is DomainObjs, ComputeRoot {
 
         // emit proof event
         uint256 _proofIndex = proofIndex;
-        emit EpochKeyProof(_proofIndex, epochKeyProofData);
+        emit EpochKeyProof(_proofIndex, currentEpoch, epochKeyProofData.epochKey, epochKeyProofData);
         getProofIndex[proofNullifier] = _proofIndex;
         proofIndex ++;
     }
@@ -378,7 +384,7 @@ contract Unirep is DomainObjs, ComputeRoot {
 
         uint256 _proofIndex = proofIndex;
         // emit proof event
-        emit UserSignedUpProof(_proofIndex, signUpProofData);
+        emit UserSignedUpProof(_proofIndex, currentEpoch, signUpProofData.epochKey, signUpProofData);
         // Process attestation
         emitAttestationEvent(msg.sender, attestation, signUpProofData.epochKey, _proofIndex);
         getProofIndex[proofNullifier] = _proofIndex;
@@ -417,6 +423,8 @@ contract Unirep is DomainObjs, ComputeRoot {
         // emit proof event
         emit ReputationNullifierProof(
             _proofIndex, 
+            currentEpoch,
+            reputationProofData.epochKey,
             reputationProofData
         );
         // Process attestation
