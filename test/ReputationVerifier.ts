@@ -266,14 +266,18 @@ describe('Verify reputation verifier', function () {
     })
 
     it('submit reputation nullifiers should succeed', async () => {
-        const tx = await unirepContractCalledByAttester.spendReputation(
+        const tx = await unirepContractCalledByAttester.spendReputation([
             results['publicSignals'].slice(0, maxReputationBudget),
+            epoch,
             epochKey,
             GSTreeRoot,
+            attesterId,
+            repNullifiersAmount,
             minRep,
             proveGraffiti,
             reputationRecords[attesterId]['graffitiPreImage'],
-            formatProofForVerifierContract(results['proof']),
+            formatProofForVerifierContract(results['proof'])
+            ],
             {value: attestingFee},
         )
         const receipt = await tx.wait()
@@ -282,14 +286,18 @@ describe('Verify reputation verifier', function () {
 
     it('submit reputation nullifiers with wrong length of nullifiers should fail', async () => {
         const wrongNullifiers = results['publicSignals'].slice(1, maxReputationBudget)
-        await expect(unirepContractCalledByAttester.spendReputation(
+        await expect(unirepContractCalledByAttester.spendReputation([
             wrongNullifiers,
+            epoch,
             epochKey,
             GSTreeRoot,
+            attesterId,
+            repNullifiersAmount,
             minRep,
             proveGraffiti,
             reputationRecords[attesterId]['graffitiPreImage'],
-            formatProofForVerifierContract(results['proof']),
+            formatProofForVerifierContract(results['proof'])
+            ],
             {value: attestingFee},
         )).to.be.revertedWith('Unirep: invalid number of reputation nullifiers')
     })

@@ -834,8 +834,8 @@
   integrity sha512-sL/cEvJWAnClXw0wHk85/2L0G6Sj8UB0Ctc1TEMbKSsmpRosqhwj9gWgFRZSrBr2f9tiXISwNhCPmlfqUqyb9Q==
 
 "@unirep/circuits@git+https://github.com/Unirep/circuits.git":
-  version "1.0.1"
-  resolved "git+https://github.com/Unirep/circuits.git#831d023a504df90de2aa89418708dc577046e3bc"
+  version "1.0.2"
+  resolved "git+https://github.com/Unirep/circuits.git#30f8971d3cffe3c7bedf9c5aca2e170931d0aa9e"
   dependencies:
     "@unirep/crypto" "git+https://github.com/Unirep/crypto.git"
     argparse "^2.0.1"

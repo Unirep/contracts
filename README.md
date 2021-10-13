@@ -1,4 +1,4 @@
-# Unirep contracts v1.0.1
+# Unirep contracts v1.0.2
 
 ## Install and build
 ```shell
