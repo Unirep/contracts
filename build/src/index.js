@@ -4,10 +4,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getUnirepContract = exports.deployUnirep = void 0;
-// The reason for the ts-ignore below is that if we are executing the code via `ts-node` instead of `hardhat`,
-// it can not read the hardhat config and error ts-2305 will be reported.
-// @ts-ignore
-const hardhat_1 = require("hardhat");
 const ethers_1 = require("ethers");
 const config_1 = require("../config");
 const Unirep_json_1 = __importDefault(require("../artifacts/contracts/Unirep.sol/Unirep.json"));
@@ -19,6 +15,25 @@ const UserStateTransitionVerifier_json_1 = __importDefault(require("../artifacts
 const ProcessAttestationsVerifier_json_1 = __importDefault(require("../artifacts/contracts/ProcessAttestationsVerifier.sol/ProcessAttestationsVerifier.json"));
 const PoseidonT3_json_1 = __importDefault(require("../artifacts/contracts/Poseidon.sol/PoseidonT3.json"));
 const PoseidonT6_json_1 = __importDefault(require("../artifacts/contracts/Poseidon.sol/PoseidonT6.json"));
+function linkLibraries({ bytecode, linkReferences, }, libraries) {
+    Object.keys(linkReferences).forEach((fileName) => {
+        Object.keys(linkReferences[fileName]).forEach((contractName) => {
+            if (!libraries.hasOwnProperty(contractName)) {
+                throw new Error(`Missing link library name ${contractName}`);
+            }
+            const address = ethers_1.utils.getAddress(libraries[contractName]).toLowerCase().slice(2);
+            linkReferences[fileName][contractName].forEach(({ start: byteStart, length: byteLength }) => {
+                const start = 2 + byteStart * 2;
+                const length = byteLength * 2;
+                bytecode = bytecode
+                    .slice(0, start)
+                    .concat(address)
+                    .concat(bytecode.slice(start + length, bytecode.length));
+            });
+        });
+    });
+    return bytecode;
+}
 const deployUnirep = async (deployer, _treeDepths, _settings) => {
     let PoseidonT3Contract, PoseidonT6Contract;
     let EpochKeyValidityVerifierContract, StartTransitionVerifierContract, ProcessAttestationsVerifierContract, UserStateTransitionVerifierContract, ReputationVerifierContract, UserSignUpVerifierContract;
@@ -72,13 +87,15 @@ const deployUnirep = async (deployer, _treeDepths, _settings) => {
             _epochLength = config_1.epochLength;
         _attestingFee = config_1.attestingFee;
     }
-    const f = await hardhat_1.ethers.getContractFactory("Unirep", {
-        signer: deployer,
-        libraries: {
-            "PoseidonT3": PoseidonT3Contract.address,
-            "PoseidonT6": PoseidonT6Contract.address
-        }
+    // Link libraries
+    const bytecode = linkLibraries({
+        'bytecode': Unirep_json_1.default.bytecode,
+        'linkReferences': Unirep_json_1.default.linkReferences
+    }, {
+        "PoseidonT3": PoseidonT3Contract.address,
+        "PoseidonT6": PoseidonT6Contract.address
     });
+    const f = new ethers_1.ethers.ContractFactory(Unirep_json_1.default.abi, bytecode, deployer);
     const c = await f.deploy(_treeDepths, {
         "maxUsers": _maxUsers,
         "maxAttesters": _maxAttesters,

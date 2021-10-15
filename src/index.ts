@@ -1,8 +1,4 @@
-// The reason for the ts-ignore below is that if we are executing the code via `ts-node` instead of `hardhat`,
-// it can not read the hardhat config and error ts-2305 will be reported.
-// @ts-ignore
-import { ethers as hardhatEthers } from 'hardhat'
-import { ethers } from 'ethers'
+import { ethers, utils } from 'ethers'
 import { maxUsers, maxAttesters, numEpochKeyNoncePerEpoch, epochLength, attestingFee, maxReputationBudget } from '../config'
 
 import Unirep from "../artifacts/contracts/Unirep.sol/Unirep.json"
@@ -15,6 +11,35 @@ import ProcessAttestationsVerifier from "../artifacts/contracts/ProcessAttestati
 
 import PoseidonT3 from "../artifacts/contracts/Poseidon.sol/PoseidonT3.json"
 import PoseidonT6 from "../artifacts/contracts/Poseidon.sol/PoseidonT6.json"
+
+function linkLibraries(
+    {
+      bytecode,
+      linkReferences,
+    }: {
+      bytecode: string
+      linkReferences: { [fileName: string]: { [contractName: string]: { length: number; start: number }[] } }
+    },
+    libraries: { [libraryName: string]: string }
+  ): string {
+    Object.keys(linkReferences).forEach((fileName) => {
+      Object.keys(linkReferences[fileName]).forEach((contractName) => {
+        if (!libraries.hasOwnProperty(contractName)) {
+          throw new Error(`Missing link library name ${contractName}`)
+        }
+        const address = utils.getAddress(libraries[contractName]).toLowerCase().slice(2)
+        linkReferences[fileName][contractName].forEach(({ start: byteStart, length: byteLength }) => {
+          const start = 2 + byteStart * 2
+          const length = byteLength * 2
+          bytecode = bytecode
+            .slice(0, start)
+            .concat(address)
+            .concat(bytecode.slice(start + length, bytecode.length))
+        })
+      })
+    })
+    return bytecode
+  }
 
 const deployUnirep = async (
     deployer: ethers.Signer,
@@ -64,7 +89,6 @@ const deployUnirep = async (
     await UserSignUpVerifierContract.deployTransaction.wait()
 
     console.log('Deploying Unirep')
-
     let _maxUsers, _maxAttesters, _numEpochKeyNoncePerEpoch, _maxReputationBudget, _epochLength, _attestingFee
     if (_settings) {
         _maxUsers = _settings.maxUsers
@@ -81,16 +105,16 @@ const deployUnirep = async (
         _epochLength = epochLength
         _attestingFee = attestingFee
     }
-    const f = await hardhatEthers.getContractFactory(
-        "Unirep",
-        {
-            signer: deployer,
-            libraries: {
-                "PoseidonT3": PoseidonT3Contract.address,
-                "PoseidonT6": PoseidonT6Contract.address
-            }
-        }
-    )
+
+    // Link libraries
+    const bytecode = linkLibraries({
+        'bytecode': Unirep.bytecode,
+        'linkReferences': Unirep.linkReferences
+    }, {
+        "PoseidonT3": PoseidonT3Contract.address,
+        "PoseidonT6": PoseidonT6Contract.address
+    })
+    const f = new ethers.ContractFactory(Unirep.abi, bytecode, deployer)
     const c = await f.deploy(
         _treeDepths,
         {
