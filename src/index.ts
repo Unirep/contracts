@@ -12,7 +12,7 @@ import ProcessAttestationsVerifier from "../artifacts/contracts/ProcessAttestati
 import PoseidonT3 from "../artifacts/contracts/Poseidon.sol/PoseidonT3.json"
 import PoseidonT6 from "../artifacts/contracts/Poseidon.sol/PoseidonT6.json"
 
-function linkLibraries(
+const linkLibraries = (
     {
       bytecode,
       linkReferences,
@@ -21,7 +21,7 @@ function linkLibraries(
       linkReferences: { [fileName: string]: { [contractName: string]: { length: number; start: number }[] } }
     },
     libraries: { [libraryName: string]: string }
-  ): string {
+  ): string => {
     Object.keys(linkReferences).forEach((fileName) => {
       Object.keys(linkReferences[fileName]).forEach((contractName) => {
         if (!libraries.hasOwnProperty(contractName)) {

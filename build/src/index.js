@@ -15,7 +15,7 @@ const UserStateTransitionVerifier_json_1 = __importDefault(require("../artifacts
 const ProcessAttestationsVerifier_json_1 = __importDefault(require("../artifacts/contracts/ProcessAttestationsVerifier.sol/ProcessAttestationsVerifier.json"));
 const PoseidonT3_json_1 = __importDefault(require("../artifacts/contracts/Poseidon.sol/PoseidonT3.json"));
 const PoseidonT6_json_1 = __importDefault(require("../artifacts/contracts/Poseidon.sol/PoseidonT6.json"));
-function linkLibraries({ bytecode, linkReferences, }, libraries) {
+const linkLibraries = ({ bytecode, linkReferences, }, libraries) => {
     Object.keys(linkReferences).forEach((fileName) => {
         Object.keys(linkReferences[fileName]).forEach((contractName) => {
             if (!libraries.hasOwnProperty(contractName)) {
@@ -33,7 +33,7 @@ function linkLibraries({ bytecode, linkReferences, }, libraries) {
         });
     });
     return bytecode;
-}
+};
 const deployUnirep = async (deployer, _treeDepths, _settings) => {
     let PoseidonT3Contract, PoseidonT6Contract;
     let EpochKeyValidityVerifierContract, StartTransitionVerifierContract, ProcessAttestationsVerifierContract, UserStateTransitionVerifierContract, ReputationVerifierContract, UserSignUpVerifierContract;
