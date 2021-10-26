@@ -36,7 +36,7 @@ const main = async () => {
     const solOut = args.sol_out
     const verifierName = args.verifier_name
     const circuitName = args.circuit_name
-    const vKey = getVKey(circuitName)
+    const vKey = await getVKey(circuitName)
 
     console.log('Exporting verification contract...')
     const verifier = genSnarkVerifierSol(
