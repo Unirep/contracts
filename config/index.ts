@@ -1,6 +1,6 @@
 import { ethers } from 'ethers'
 
-const attestingFee = ethers.utils.parseEther("0.01")
+const attestingFee = ethers.utils.parseEther("0")
 
 const numEpochKeyNoncePerEpoch = 3;
 

@@ -157,4 +157,5 @@ const getUnirepContract = (addressOrName: string, signerOrProvider: ethers.Signe
 export {
     deployUnirep,
     getUnirepContract,
+    Unirep
 }

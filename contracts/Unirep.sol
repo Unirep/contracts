@@ -49,7 +49,7 @@ contract Unirep is DomainObjs, ComputeRoot {
     // Maximum number of reputation nullifiers in a proof
     uint8 immutable public maxReputationBudget;
 
-    // The maximum number of signups allowed
+    // The maximum number of users allowed
     uint256 immutable public maxUsers;
 
     // The maximum number of attesters allowed
@@ -98,10 +98,12 @@ contract Unirep is DomainObjs, ComputeRoot {
         uint256 _proofIndex
     );
 
+    // @ _proofIndex: the proof index of th receiver's epoch key
     event AttestationSubmitted(
         uint256 indexed _epoch,
         uint256 indexed _epochKey,
         address indexed _attester,
+        string _event,
         Attestation attestation,
         uint256 _proofIndex
     );
@@ -212,6 +214,7 @@ contract Unirep is DomainObjs, ComputeRoot {
     /*
      * User signs up by providing an identity commitment. It also inserts a fresh state
      * leaf into the state tree.
+     * if user signs up through an atteser who sets airdrop, Unirep will give the user the airdrop reputation.
      * @param _identityCommitment Commitment of the user's identity which is a semaphore identity.
      */
     function userSignUp(uint256 _identityCommitment) external {
@@ -300,9 +303,10 @@ contract Unirep is DomainObjs, ComputeRoot {
     }
 
     /*
-     * An attester submit the attestation with an epoch key proof
+     * An attester submit the attestation with a proof index
      * @param attestation The attestation that the attester wants to send to the epoch key
-     * @param epochKeyProofData The epoch key and its epoch key proof and public signals 
+     * @param epochKey The epoch key which receives attestation
+     * @param _proofIndex The proof index of the epoch key, which might be epochKeyProof, signedUpProof, reputationProof
      */
     function submitAttestation(Attestation calldata attestation, uint256 epochKey, uint256 _proofIndex) external payable {
         require(attesters[msg.sender] > 0, "Unirep: attester has not signed up yet");
@@ -314,7 +318,7 @@ contract Unirep is DomainObjs, ComputeRoot {
         collectedAttestingFee = collectedAttestingFee.add(msg.value);
 
          // Process attestation
-        emitAttestationEvent(msg.sender, attestation, epochKey, _proofIndex);
+        emitAttestationEvent(msg.sender, attestation, epochKey, _proofIndex, "submitAttestation");
     }
 
     /*
@@ -322,7 +326,8 @@ contract Unirep is DomainObjs, ComputeRoot {
      * @param attester The address of the attester
      * @param signature The signature of the attester
      * @param attestation The attestation including positive reputation, negative reputation or graffiti
-     * @param epochKeyProofData The epoch key proof and the public signals 
+     * @param epochKey The epoch key which receives attestation
+     * @param _proofIndex The proof index of the epoch key, which might be epochKeyProof, signedUpProof, reputationProof
      */
     function submitAttestationViaRelayer(
         address attester,
@@ -341,7 +346,7 @@ contract Unirep is DomainObjs, ComputeRoot {
         collectedAttestingFee = collectedAttestingFee.add(msg.value);
 
         // Process attestation
-        emitAttestationEvent(attester, attestation, epochKey, _proofIndex);
+        emitAttestationEvent(attester, attestation, epochKey, _proofIndex, "submitAttestation");
     }
 
     /*
@@ -386,20 +391,14 @@ contract Unirep is DomainObjs, ComputeRoot {
         // emit proof event
         emit UserSignedUpProof(_proofIndex, currentEpoch, signUpProofData.epochKey, signUpProofData);
         // Process attestation
-        emitAttestationEvent(msg.sender, attestation, signUpProofData.epochKey, _proofIndex);
+        emitAttestationEvent(msg.sender, attestation, signUpProofData.epochKey, _proofIndex, "airdropEpochKey");
         getProofIndex[proofNullifier] = _proofIndex;
         proofIndex ++;
     }
 
     /*
      * A user spend reputation via an attester, the non-zero nullifiers will be processed as a negative attestation
-     * @param _repNullifiers The reputation nullifiers that the user submitted to avoid double spending
-     * @param _epochKey The epoch key of the user to receive negative attestation
-     * @param _globalStateTree The global state tree root of the reputation proof
-     * @param _minRep The minimum reputation that a user wants to prove that he has at least
-     * @param _proveGraffiti The flag to indicate if the user wants to prove the pre-image of the graffiti
-     * @param _graffitiPreImage The graffiti preimage that the user wants to prove
-     * @param _proof The reputatiaon proof
+     * @param reputationProofData The epoch key and its proof and the public signals 
      */
     function spendReputation(ReputationProofRelated memory reputationProofData) external payable {
         bytes32 proofNullifier = hashReputationProof(reputationProofData);
@@ -428,12 +427,12 @@ contract Unirep is DomainObjs, ComputeRoot {
             reputationProofData
         );
         // Process attestation
-        emitAttestationEvent(msg.sender, attestation, reputationProofData.epochKey, _proofIndex);
+        emitAttestationEvent(msg.sender, attestation, reputationProofData.epochKey, _proofIndex, "spendReputation");
         getProofIndex[proofNullifier] = _proofIndex;
         proofIndex ++;
     }
 
-    function emitAttestationEvent(address attester, Attestation memory attestation, uint256 epochKey, uint256 _proofIndex) internal {
+    function emitAttestationEvent(address attester, Attestation memory attestation, uint256 epochKey, uint256 _proofIndex, string memory _event) internal {
 
         // Validate attestation data
         require(attestation.posRep < SNARK_SCALAR_FIELD, "Unirep: invalid attestation posRep");
@@ -448,6 +447,7 @@ contract Unirep is DomainObjs, ComputeRoot {
             currentEpoch,
             epochKey,
             attester,
+            _event,
             attestation,
             _proofIndex
         );
@@ -562,7 +562,7 @@ contract Unirep is DomainObjs, ComputeRoot {
         uint256 _GSTRoot,
         uint256[8] calldata _proof) external view returns (bool) {
 
-        uint256[] memory _publicSignals = new uint256[](4);
+        uint256[] memory _publicSignals = new uint256[](3);
         _publicSignals[0] = _blindedUserState;
         _publicSignals[1] = _blindedHashChain;
         _publicSignals[2] = _GSTRoot;
@@ -596,7 +596,7 @@ contract Unirep is DomainObjs, ComputeRoot {
         uint256 _inputBlindedUserState,
         uint256[8] calldata _proof) external view returns (bool) {
 
-        uint256[] memory _publicSignals = new uint256[](4);
+        uint256[] memory _publicSignals = new uint256[](3);
         _publicSignals[0] = _outputBlindedUserState;
         _publicSignals[1] = _outputBlindedHashChain;
         _publicSignals[2] = _inputBlindedUserState;

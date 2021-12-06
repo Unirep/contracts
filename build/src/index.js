@@ -3,10 +3,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getUnirepContract = exports.deployUnirep = void 0;
+exports.Unirep = exports.getUnirepContract = exports.deployUnirep = void 0;
 const ethers_1 = require("ethers");
 const config_1 = require("../config");
 const Unirep_json_1 = __importDefault(require("../artifacts/contracts/Unirep.sol/Unirep.json"));
+exports.Unirep = Unirep_json_1.default;
 const EpochKeyValidityVerifier_json_1 = __importDefault(require("../artifacts/contracts/EpochKeyValidityVerifier.sol/EpochKeyValidityVerifier.json"));
 const ReputationVerifier_json_1 = __importDefault(require("../artifacts/contracts/ReputationVerifier.sol/ReputationVerifier.json"));
 const UserSignUpVerifier_json_1 = __importDefault(require("../artifacts/contracts/UserSignUpVerifier.sol/UserSignUpVerifier.json"));
