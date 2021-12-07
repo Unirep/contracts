@@ -1,7 +1,7 @@
 import { ethers as hardhatEthers } from 'hardhat'
 import { ethers } from 'ethers'
 import { expect } from "chai"
-import { genProofAndPublicSignals, verifyProof, formatProofForVerifierContract } from "@unirep/circuits"
+import { genProofAndPublicSignals, verifyProof, formatProofForVerifierContract, CircuitName } from "@unirep/circuits"
 import { genRandomSalt, hashLeftRight, genIdentity, genIdentityCommitment, IncrementalQuinTree,  stringifyBigInts, SparseMerkleTreeImpl, hashOne, } from "@unirep/crypto"
 import { circuitEpochTreeDepth, circuitGlobalStateTreeDepth, } from "../config"
 import { genEpochKey, genNewUserStateTree, getTreeDepthsForTesting, Reputation } from './utils'
@@ -90,10 +90,10 @@ describe('Verify user sign up verifier', function () {
             UST_path_elements: USTPathElements,
         }
         const startTime = new Date().getTime()
-        results = await genProofAndPublicSignals('proveUserSignUp',stringifyBigInts(circuitInputs))
+        results = await genProofAndPublicSignals(CircuitName.proveUserSignUp,stringifyBigInts(circuitInputs))
         const endTime = new Date().getTime()
         console.log(`Gen Proof time: ${endTime - startTime} ms (${Math.floor((endTime - startTime) / 1000)} s)`)
-        const isValid = await verifyProof('proveUserSignUp',results['proof'], results['publicSignals'])
+        const isValid = await verifyProof(CircuitName.proveUserSignUp,results['proof'], results['publicSignals'])
         expect(isValid).to.be.true
 
         const isProofValid = await unirepContract.verifyUserSignUp(
@@ -101,6 +101,7 @@ describe('Verify user sign up verifier', function () {
             epochKey,
             GSTreeRoot,
             attesterId,
+            signUp,
             formatProofForVerifierContract(results['proof']),
         )
         expect(isProofValid, 'Verify reputation proof on-chain failed').to.be.true
@@ -113,6 +114,7 @@ describe('Verify user sign up verifier', function () {
             epochKey,
             GSTreeRoot,
             wrongAttesterId,
+            signUp,
             formatProofForVerifierContract(results['proof']),
         )
         expect(isProofValid, 'Verify user sign up proof on-chain should fail').to.be.false
@@ -126,6 +128,7 @@ describe('Verify user sign up verifier', function () {
             epochKey,
             GSTreeRoot,
             attesterId,
+            signUp,
             formatProofForVerifierContract(results['proof']),
         )
         expect(isProofValid, 'Verify user sign up proof on-chain should fail').to.be.false
@@ -139,6 +142,7 @@ describe('Verify user sign up verifier', function () {
             wrongEpochKey,
             GSTreeRoot,
             attesterId,
+            signUp,
             formatProofForVerifierContract(results['proof']),
         )
         expect(isProofValid, 'Verify user sign up proof on-chain should fail').to.be.false

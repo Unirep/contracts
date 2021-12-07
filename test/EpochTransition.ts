@@ -2,7 +2,7 @@ import { ethers as hardhatEthers } from 'hardhat'
 import { ethers } from 'ethers'
 import { expect } from "chai"
 import { genRandomSalt, hashLeftRight, IncrementalQuinTree, genIdentity, genIdentityCommitment, stringifyBigInts } from '@unirep/crypto'
-import { formatProofForVerifierContract, genProofAndPublicSignals, verifyProof } from '@unirep/circuits'
+import { CircuitName, formatProofForVerifierContract, genProofAndPublicSignals, verifyProof } from '@unirep/circuits'
 
 import { attestingFee, epochLength, maxAttesters, maxReputationBudget, maxUsers, numEpochKeyNoncePerEpoch } from '../config'
 import { computeEmptyUserStateRoot, genEpochKey, getTreeDepthsForTesting, Attestation, IEpochTreeLeaf, UnirepState, UserState } from './utils'
@@ -91,8 +91,8 @@ describe('Epoch Transition', function () {
         let nonce = 1
         let epochKey = genEpochKey(userId.identityNullifier, epoch, nonce)
         let circuitInputs = await userState.genVerifyEpochKeyCircuitInputs(nonce)
-        results = await genProofAndPublicSignals('verifyEpochKey', stringifyBigInts(circuitInputs))
-        let isValid = await verifyProof('verifyEpochKey', results['proof'], results['publicSignals'])
+        results = await genProofAndPublicSignals(CircuitName.verifyEpochKey, stringifyBigInts(circuitInputs))
+        let isValid = await verifyProof(CircuitName.verifyEpochKey, results['proof'], results['publicSignals'])
         let GSTRoot = results['publicSignals'][0]
         let epochKeyProof = results['publicSignals'].concat([formatProofForVerifierContract(results['proof'])])
         expect(isValid, 'Verify epoch key proof off-chain failed').to.be.true
@@ -128,8 +128,8 @@ describe('Epoch Transition', function () {
         nonce = 2
         epochKey = genEpochKey(userId.identityNullifier, epoch, nonce)
         circuitInputs = await userState.genVerifyEpochKeyCircuitInputs(nonce)
-        results = await genProofAndPublicSignals('verifyEpochKey', stringifyBigInts(circuitInputs))
-        isValid = await verifyProof('verifyEpochKey', results['proof'], results['publicSignals'])
+        results = await genProofAndPublicSignals(CircuitName.verifyEpochKey, stringifyBigInts(circuitInputs))
+        isValid = await verifyProof(CircuitName.verifyEpochKey, results['proof'], results['publicSignals'])
         GSTRoot = results['publicSignals'][0]
         epochKeyProof = results['publicSignals'].concat([formatProofForVerifierContract(results['proof'])])
 
@@ -155,8 +155,8 @@ describe('Epoch Transition', function () {
         nonce = 0
         epochKey = genEpochKey(userId.identityNullifier, epoch, nonce)
         circuitInputs = await userState.genVerifyEpochKeyCircuitInputs(nonce)
-        results = await genProofAndPublicSignals('verifyEpochKey', stringifyBigInts(circuitInputs))
-        isValid = await verifyProof('verifyEpochKey', results['proof'], results['publicSignals'])
+        results = await genProofAndPublicSignals(CircuitName.verifyEpochKey, stringifyBigInts(circuitInputs))
+        isValid = await verifyProof(CircuitName.verifyEpochKey, results['proof'], results['publicSignals'])
         GSTRoot = results['publicSignals'][0]
         epochKeyProof = results['publicSignals'].concat([formatProofForVerifierContract(results['proof'])])
 
@@ -275,8 +275,8 @@ describe('Epoch Transition', function () {
         
     it('start user state transition should succeed', async() => {
         circuitInputs = await userState.genUserStateTransitionCircuitInputs()
-        results = await genProofAndPublicSignals('startTransition', circuitInputs.startTransitionProof)
-        const isValid = await verifyProof('startTransition', results['proof'], results['publicSignals'])
+        results = await genProofAndPublicSignals(CircuitName.startTransition, circuitInputs.startTransitionProof)
+        const isValid = await verifyProof(CircuitName.startTransition, results['proof'], results['publicSignals'])
         expect(isValid, 'Verify start transition circuit off-chain failed').to.be.true
 
         const blindedUserState = results['publicSignals'][0]
@@ -307,8 +307,8 @@ describe('Epoch Transition', function () {
 
     it('submit process attestations proofs should succeed', async() => {
         for (let i = 0; i < circuitInputs.processAttestationProof.length; i++) {
-            results = await genProofAndPublicSignals('processAttestations', circuitInputs.processAttestationProof[i])
-            const isValid = await verifyProof('processAttestations', results['proof'], results['publicSignals'])
+            results = await genProofAndPublicSignals(CircuitName.processAttestations, circuitInputs.processAttestationProof[i])
+            const isValid = await verifyProof(CircuitName.processAttestations, results['proof'], results['publicSignals'])
             expect(isValid, 'Verify process attestations circuit off-chain failed').to.be.true
 
             const outputBlindedUserState = results['publicSignals'][0]
@@ -340,8 +340,8 @@ describe('Epoch Transition', function () {
     })
 
     it('submit user state transition proofs should succeed', async() => {
-        results = await genProofAndPublicSignals('userStateTransition', circuitInputs.finalTransitionProof)
-        const isValid = await verifyProof('userStateTransition', results['proof'], results['publicSignals'])
+        results = await genProofAndPublicSignals(CircuitName.userStateTransition, circuitInputs.finalTransitionProof)
+        const isValid = await verifyProof(CircuitName.userStateTransition, results['proof'], results['publicSignals'])
         expect(isValid, 'Verify user state transition circuit off-chain failed').to.be.true
 
         const newGSTLeaf = results['publicSignals'][0]

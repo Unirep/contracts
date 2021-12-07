@@ -1,7 +1,7 @@
 import { ethers as hardhatEthers } from 'hardhat'
 import { ethers } from 'ethers'
 import { expect } from "chai"
-import { genProofAndPublicSignals, verifyProof, formatProofForVerifierContract } from "@unirep/circuits"
+import { genProofAndPublicSignals, verifyProof, formatProofForVerifierContract, CircuitName } from "@unirep/circuits"
 import { genRandomSalt, hashLeftRight, genIdentity, genIdentityCommitment, IncrementalQuinTree,  stringifyBigInts, SparseMerkleTreeImpl, hashOne, } from "@unirep/crypto"
 import { circuitEpochTreeDepth, circuitGlobalStateTreeDepth, maxReputationBudget, circuitUserStateTreeDepth, attestingFee } from "../config"
 import { genEpochKey, genNewUserStateTree, getTreeDepthsForTesting, Reputation } from './utils'
@@ -110,10 +110,10 @@ describe('Verify reputation verifier', function () {
             graffiti_pre_image: reputationRecords[attesterId]['graffitiPreImage']
         }
         const startTime = new Date().getTime()
-        results = await genProofAndPublicSignals('proveReputation',stringifyBigInts(circuitInputs))
+        results = await genProofAndPublicSignals(CircuitName.proveReputation,stringifyBigInts(circuitInputs))
         const endTime = new Date().getTime()
         console.log(`Gen Proof time: ${endTime - startTime} ms (${Math.floor((endTime - startTime) / 1000)} s)`)
-        const isValid = await verifyProof('proveReputation',results['proof'], results['publicSignals'])
+        const isValid = await verifyProof(CircuitName.proveReputation,results['proof'], results['publicSignals'])
         expect(isValid).to.be.true
 
         const isProofValid = await unirepContract.verifyReputation(

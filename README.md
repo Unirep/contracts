@@ -1,4 +1,4 @@
-# Unirep contracts v1.0.3
+# Unirep contracts v1.0.4
 
 ## Install and build
 ```shell
@@ -30,3 +30,10 @@ yarn test
 - `UnirepParamters.sol`
 - `UserSignUpVerifier.sol`
 - `UserStateTransitionVerifier.sol`
+
+## v1.0.4 Update log
+- Update @unirep/circuits version
+- User can prove that he has not signed up in one leaf to get airdrop
+  `proveUserSignUp` circuit: change `sign_up` from private input to public input
+- New paramter `uint256 userHasSignedUp;` in `UnirepParameters.sol`
+- New input in `verifyUserSignUp` function

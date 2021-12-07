@@ -35,6 +35,7 @@ contract UnirepParameters {
         uint256 epochKey;
         uint256 globalStateTree;
         uint256 attesterId;
+        uint256 userHasSignedUp;
         uint256[8] proof;
     }
 

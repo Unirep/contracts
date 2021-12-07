@@ -733,16 +733,18 @@ contract Unirep is DomainObjs, ComputeRoot {
         uint256 _epochKey,
         uint256 _globalStateTree,
         uint256 _attesterId,
+        uint256 _userHasSignedUp,
         uint256[8] calldata _proof) external view returns (bool) {
         // User prove his reputation by an attester:
         // 1. User exists in GST
         // 2. It is the latest state user transition to
         // 3. User has a signUp flag in the attester's leaf
-        uint256[] memory _publicSignals = new uint256[](4);
+        uint256[] memory _publicSignals = new uint256[](5);
         _publicSignals[0] = _epoch;
         _publicSignals[1] = _epochKey;
         _publicSignals[2] = _globalStateTree;
         _publicSignals[3] = _attesterId;
+        _publicSignals[4] = _userHasSignedUp;
 
         // Ensure that each public input is within range of the snark scalar
         // field.

@@ -6,7 +6,6 @@ import { genRandomSalt, SNARK_FIELD_SIZE, genIdentity, genIdentityCommitment } f
 import { attestingFee, epochLength, maxAttesters, maxReputationBudget, maxUsers, numEpochKeyNoncePerEpoch } from '../config'
 import { genEpochKey, getTreeDepthsForTesting, Attestation, computeEpochKeyProofHash } from './utils'
 import { deployUnirep } from '../src'
-import Unirep from "../artifacts/contracts/Unirep.sol/Unirep.json"
 
 describe('Attesting', () => {
     let unirepContract
@@ -43,6 +42,7 @@ describe('Attesting', () => {
     const nonce = 0
     const epochKey = genEpochKey(genRandomSalt(), epoch, nonce)
     const epochKeyProof = [genRandomSalt(), epoch, epochKey, proof]
+    const signUpFlag = 0
     let epochKeyProofIndex
 
     before(async () => {
@@ -142,7 +142,7 @@ describe('Attesting', () => {
     })
 
     it('submit get airdrop should succeed', async () => {
-        const userSignUpProof = [epoch, epochKey, genRandomSalt(), attesterId, proof]
+        const userSignUpProof = [epoch, epochKey, genRandomSalt(), attesterId, signUpFlag, proof]
         
         let tx = await unirepContractCalledByAttester.airdropEpochKey(userSignUpProof, {value: attestingFee})
         const receipt = await tx.wait()
@@ -275,6 +275,7 @@ describe('Attesting', () => {
                     args?.epochKey,
                     args?.globalStateTree,
                     args?.attesterId,
+                    args?.userHasSignedUp,
                     args?.proof,
                 )
                 // should not be reverted with invalid input

@@ -2,7 +2,7 @@ import { ethers as hardhatEthers } from 'hardhat'
 import { ethers } from 'ethers'
 import { expect } from "chai"
 import { genRandomSalt, hashLeftRight, hash5, stringifyBigInts, genIdentity, genIdentityCommitment } from '@unirep/crypto'
-import { genProofAndPublicSignals, verifyProof } from '@unirep/circuits'
+import { CircuitName, genProofAndPublicSignals, verifyProof } from '@unirep/circuits'
 
 import { attestingFee, epochLength, maxUsers, numEpochKeyNoncePerEpoch, circuitUserStateTreeDepth, maxReputationBudget, maxAttesters } from '../config'
 import { getTreeDepthsForTesting, UnirepState, UserState, genNewSMT } from './utils'
@@ -130,10 +130,10 @@ describe('Airdrop', function () {
         const minPosRep = 19, graffitiPreImage = 0
         const circuitInputs = await userState.genProveReputationCircuitInputs(BigInt(attesterId), repNullifiersAmount, testNonceStarter, epkNonce, minPosRep, proveGraffiti, graffitiPreImage)
         const startTime = new Date().getTime()
-        const results = await genProofAndPublicSignals('proveReputation', stringifyBigInts(circuitInputs))
+        const results = await genProofAndPublicSignals(CircuitName.proveReputation, stringifyBigInts(circuitInputs))
         const endTime = new Date().getTime()
         console.log(`Gen Proof time: ${endTime - startTime} ms (${Math.floor((endTime - startTime) / 1000)} s)`)
-        const isValid = await verifyProof('proveReputation', results['proof'], results['publicSignals'])
+        const isValid = await verifyProof(CircuitName.proveReputation, results['proof'], results['publicSignals'])
         expect(isValid, 'Verify reputation proof off-chain failed').to.be.true
     })
 
@@ -174,10 +174,10 @@ describe('Airdrop', function () {
         const minPosRep = 19, graffitiPreImage = 0
         const circuitInputs = await userState.genProveReputationCircuitInputs(BigInt(attesterId), repNullifiersAmount, testNonceStarter, epkNonce, minPosRep, proveGraffiti, graffitiPreImage)
         const startTime = new Date().getTime()
-        const results = await genProofAndPublicSignals('proveReputation', stringifyBigInts(circuitInputs))
+        const results = await genProofAndPublicSignals(CircuitName.proveReputation, stringifyBigInts(circuitInputs))
         const endTime = new Date().getTime()
         console.log(`Gen Proof time: ${endTime - startTime} ms (${Math.floor((endTime - startTime) / 1000)} s)`)
-        const isValid = await verifyProof('proveReputation', results['proof'], results['publicSignals'])
+        const isValid = await verifyProof(CircuitName.proveReputation, results['proof'], results['publicSignals'])
         expect(isValid, 'Verify reputation proof off-chain failed').to.be.false
     })
 

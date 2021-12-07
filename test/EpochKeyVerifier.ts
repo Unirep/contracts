@@ -1,7 +1,7 @@
 import { ethers as hardhatEthers } from 'hardhat'
 import { ethers } from 'ethers'
 import { expect } from "chai"
-import { genProofAndPublicSignals, verifyProof, formatProofForVerifierContract } from "@unirep/circuits"
+import { genProofAndPublicSignals, verifyProof, formatProofForVerifierContract, CircuitName } from "@unirep/circuits"
 import { genRandomSalt, hashLeftRight, genIdentity, genIdentityCommitment, IncrementalQuinTree,  stringifyBigInts, } from "@unirep/crypto"
 import { numEpochKeyNoncePerEpoch, circuitEpochTreeDepth, circuitGlobalStateTreeDepth } from "../config"
 import { genEpochKey, getTreeDepthsForTesting } from './utils'
@@ -61,10 +61,10 @@ describe('Verify Epoch Key verifier', function () {
                 epoch_key: epk,
             }
             const startTime = new Date().getTime()
-            results = await genProofAndPublicSignals('verifyEpochKey', stringifyBigInts(circuitInputs))
+            results = await genProofAndPublicSignals(CircuitName.verifyEpochKey, stringifyBigInts(circuitInputs))
             const endTime = new Date().getTime()
             console.log(`Gen Proof time: ${endTime - startTime} ms (${Math.floor((endTime - startTime) / 1000)} s)`)
-            const isValid = await verifyProof('verifyEpochKey', results['proof'], results['publicSignals'])
+            const isValid = await verifyProof(CircuitName.verifyEpochKey, results['proof'], results['publicSignals'])
             expect(isValid).to.be.true
 
             const isProofValid = await unirepContract.verifyEpochKeyValidity(
