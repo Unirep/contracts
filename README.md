@@ -37,3 +37,4 @@ yarn test
   `proveUserSignUp` circuit: change `sign_up` from private input to public input
 - New paramter `uint256 userHasSignedUp;` in `UnirepParameters.sol`
 - New input in `verifyUserSignUp` function
+- `submitAttestation`: proof index should not be zero
