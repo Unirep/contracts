@@ -312,7 +312,7 @@ contract Unirep is DomainObjs, ComputeRoot {
         require(attesters[msg.sender] > 0, "Unirep: attester has not signed up yet");
         require(attesters[msg.sender] == attestation.attesterId, "Unirep: mismatched attesterId");
         require(msg.value == attestingFee, "Unirep: no attesting fee or incorrect amount");
-        require(_proofIndex < proofIndex, "Unirep: invalid proof index");
+        require((_proofIndex != 0) && (_proofIndex < proofIndex), "Unirep: invalid proof index");
 
         // Add to the cumulated attesting fee
         collectedAttestingFee = collectedAttestingFee.add(msg.value);
@@ -340,7 +340,7 @@ contract Unirep is DomainObjs, ComputeRoot {
         require(attesters[attester] > 0, "Unirep: attester has not signed up yet");
         require(attesters[attester] == attestation.attesterId, "Unirep: mismatched attesterId");
         require(msg.value == attestingFee, "Unirep: no attesting fee or incorrect amount");
-        require(_proofIndex < proofIndex, "Unirep: invalid proof index");
+        require((_proofIndex != 0) && (_proofIndex < proofIndex), "Unirep: invalid proof index");
 
         // Add to the cumulated attesting fee
         collectedAttestingFee = collectedAttestingFee.add(msg.value);
@@ -507,6 +507,9 @@ contract Unirep is DomainObjs, ComputeRoot {
         require(userTransitionedData.epkNullifiers.length == numEpochKeyNoncePerEpoch, "Unirep: invalid number of epk nullifiers");
         require(userTransitionedData.blindedUserStates.length == 2, "Unirep: invalid number of blinded user states");
         require(userTransitionedData.blindedHashChains.length == numEpochKeyNoncePerEpoch, "Unirep: invalid number of blinded hash chains");
+        for (uint256 i = 0; i < proofIndexRecords.length; i++) {
+            require(proofIndexRecords[i] != 0 && (proofIndexRecords[i] < proofIndex), "Unirep: invalid proof index");
+        }
         
         uint256 _proofIndex = proofIndex;
         emit Sequencer(currentEpoch, "NewGSTLeafInserted");
