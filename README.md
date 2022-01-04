@@ -17,17 +17,14 @@ yarn test
 
 ## Contracts
 - `Address.sol`
-- `ComputeRoot.sol`
-- `DomainObjs.sol`
 - `EpochKeyValidityVerifier.sol`
 - `Hasher.sol`
-- `Poseidon.sol`
 - `ProcessAttestationsVerifier.sol`
 - `ReputationVerifier.sol`
 - `SnarkConstants.sol`
 - `StartTransitionVerifier.sol`
 - `Unirep.sol`
-- `UnirepParamters.sol`
+- `UnirepObjs.sol`
 - `UserSignUpVerifier.sol`
 - `UserStateTransitionVerifier.sol`
 
