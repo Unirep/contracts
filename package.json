@@ -6,7 +6,7 @@
   "license": "MIT",
   "scripts": {
     "build": "./scripts/buildVerifiers.sh && yarn compile && tsc",
-    "compile": "npx hardhat compile && npx ts-node scripts/buildPoseidon.ts",
+    "compile": "npx hardhat compile",
     "test": "npx hardhat test --no-compile"
   },
   "dependencies": {

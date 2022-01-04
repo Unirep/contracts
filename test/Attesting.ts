@@ -1,3 +1,4 @@
+// @ts-ignore
 import { ethers as hardhatEthers } from 'hardhat'
 import { ethers } from 'ethers'
 import { expect } from "chai"
@@ -5,18 +6,15 @@ import { genRandomSalt, SNARK_FIELD_SIZE, genIdentity, genIdentityCommitment } f
 
 import { epochLength, maxAttesters, maxReputationBudget, maxUsers, numEpochKeyNoncePerEpoch } from '../config'
 import { genEpochKey, getTreeDepthsForTesting, Attestation, computeEpochKeyProofHash } from './utils'
-import { deployUnirep } from '../src'
-import Unirep from "../artifacts/contracts/Unirep.sol/Unirep.json"
+import { deployUnirep, Unirep } from '../src'
 
 describe('Attesting', () => {
     let unirepContract
-
     let accounts: ethers.Signer[]
 
     let userId, userCommitment
-
     let attester, attesterAddress, attesterId, unirepContractCalledByAttester
-    let attester2, attester2Address, unirepContractCalledByAttester2
+    let attester2, unirepContractCalledByAttester2
 
     const signedUpInLeaf = 1
     const proof: BigInt[] = []
@@ -61,7 +59,6 @@ describe('Attesting', () => {
         attesterId = await unirepContract.attesters(attesterAddress)
         // Sign up another attester
         attester2 = accounts[2]
-        attester2Address = await attester2.getAddress()
         unirepContractCalledByAttester2 = unirepContract.connect(attester2)
         tx = await unirepContractCalledByAttester2.attesterSignUp()
         receipt = await tx.wait()
@@ -82,12 +79,14 @@ describe('Attesting', () => {
     })
 
     it('submit an epoch key proof again should fail', async () => {
-        await expect(unirepContract.submitEpochKeyProof(epochKeyProof)).to.be.revertedWith('Unirep: the proof has been submitted before')
+        await expect(unirepContract.submitEpochKeyProof(epochKeyProof))
+            .to.be.revertedWith('Unirep: the proof has been submitted before')
     })
 
     it('submit an epoch key proof with wrong epoch should fail', async () => {
         const wrongEpochKeyProof = [genRandomSalt(), epoch + 1, epochKey, proof]
-        await expect(unirepContract.submitEpochKeyProof(wrongEpochKeyProof)).to.be.revertedWith('Unirep: submit an epoch key proof with incorrect epoch')
+        await expect(unirepContract.submitEpochKeyProof(wrongEpochKeyProof))
+            .to.be.revertedWith('Unirep: submit an epoch key proof with incorrect epoch')
     })
 
     it('submit attestation should succeed', async () => {
@@ -218,7 +217,7 @@ describe('Attesting', () => {
             epochKey,
             epochKeyProofIndex,
             {value: attestingFee})
-        ).to.be.revertedWith('Unirep: invalid attestation signUp')
+        ).to.be.revertedWith('Unirep: invalid sign up flag')
     })
 
     it('attestation with zero proof index should fail', async () => {

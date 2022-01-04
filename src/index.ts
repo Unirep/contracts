@@ -1,4 +1,5 @@
-import { ethers, utils } from 'ethers'
+import { ethers } from 'ethers'
+import { Circuit, formatProofForSnarkjsVerification, verifyProof } from '@unirep/circuits'
 import { maxUsers, maxAttesters, numEpochKeyNoncePerEpoch, epochLength, attestingFee, maxReputationBudget } from '../config'
 
 import Unirep from "../artifacts/contracts/Unirep.sol/Unirep.json"
@@ -8,55 +9,238 @@ import UserSignUpVerifier from "../artifacts/contracts/UserSignUpVerifier.sol/Us
 import StartTransitionVerifier from "../artifacts/contracts/StartTransitionVerifier.sol/StartTransitionVerifier.json"
 import UserStateTransitionVerifier from "../artifacts/contracts/UserStateTransitionVerifier.sol/UserStateTransitionVerifier.json"
 import ProcessAttestationsVerifier from "../artifacts/contracts/ProcessAttestationsVerifier.sol/ProcessAttestationsVerifier.json"
+import { hash5 } from '@unirep/crypto'
 
-import PoseidonT3 from "../artifacts/contracts/Poseidon.sol/PoseidonT3.json"
-import PoseidonT6 from "../artifacts/contracts/Poseidon.sol/PoseidonT6.json"
+export type Field = BigInt | string | number | ethers.BigNumber
 
-const linkLibraries = (
-    {
-      bytecode,
-      linkReferences,
-    }: {
-      bytecode: string
-      linkReferences: { [fileName: string]: { [contractName: string]: { length: number; start: number }[] } }
-    },
-    libraries: { [libraryName: string]: string }
-  ): string => {
-    Object.keys(linkReferences).forEach((fileName) => {
-      Object.keys(linkReferences[fileName]).forEach((contractName) => {
-        if (!libraries.hasOwnProperty(contractName)) {
-          throw new Error(`Missing link library name ${contractName}`)
+enum Event {
+  UserSignedUp,
+  UserStateTransitioned,
+  AttestationSubmitted,
+  EpochEnded
+}
+
+enum AttestationEvent {
+    SendAttestation,
+    Airdrop,
+    SpendReputation
+}
+
+interface IAttestation {
+    attesterId: BigInt;
+    posRep: BigInt;
+    negRep: BigInt;
+    graffiti: BigInt;
+    signUp: BigInt;
+    hash(): BigInt;
+}
+
+interface IEpochKeyProof {
+    globalStateTree: Field;
+    epoch: Field;
+    epochKey: Field;
+    proof: Field[];
+}
+
+interface IReputationProof {
+    repNullifiers: Field[],
+    epoch: Field;
+    epochKey: Field;
+    globalStateTree: Field;
+    attesterId: Field;
+    proveReputationAmount: Field;
+    minRep: Field;
+    proveGraffiti: Field;
+    graffitiPreImage: Field;
+    proof: Field[];
+}
+
+interface ISignUpProof {
+    epoch: Field;
+    epochKey: Field;
+    globalStateTree: Field;
+    attesterId: Field;
+    userHasSignedUp: Field;
+    proof: Field[];
+}
+
+interface IUserTransitionProof {
+    newGlobalStateTreeLeaf: Field;
+    epkNullifiers: Field[];
+    transitionFromEpoch: Field;
+    blindedUserStates: Field[];
+    fromGlobalStateTree: Field;
+    blindedHashChains: Field[];
+    fromEpochTree: Field;
+    proof: Field[];
+}
+
+class Attestation implements IAttestation {
+    public attesterId: BigInt
+    public posRep: BigInt
+    public negRep: BigInt
+    public graffiti: BigInt
+    public signUp: BigInt
+
+    constructor(
+        _attesterId: BigInt,
+        _posRep: BigInt,
+        _negRep: BigInt,
+        _graffiti: BigInt,
+        _signUp: BigInt,
+    ) {
+        this.attesterId = _attesterId
+        this.posRep = _posRep
+        this.negRep = _negRep
+        this.graffiti = _graffiti
+        this.signUp = _signUp
+    }
+
+    public hash = (): BigInt => {
+        return hash5([
+            this.attesterId,
+            this.posRep,
+            this.negRep,
+            this.graffiti,
+            this.signUp,
+        ])
+    }
+}
+
+// the struct EpochKeyProof in UnirepObjs
+class EpochKeyProof implements IEpochKeyProof {
+    public globalStateTree: Field
+    public epoch: Field
+    public epochKey: Field
+    public proof: Field[]
+    private publicSignals: Field[]
+
+    constructor(
+        _publicSignals: Field[],
+        _proof: Field[]
+    ) {
+        this.globalStateTree = _publicSignals[0]
+        this.epoch = _publicSignals[1]
+        this.epochKey = _publicSignals[2]
+        this.proof = _proof
+        this.publicSignals = _publicSignals
+    }
+
+    public verify = (): Promise<boolean> => {
+        const proof_ = formatProofForSnarkjsVerification(this.proof.map(n => n.toString()))
+        return verifyProof(Circuit.verifyEpochKey, proof_, this.publicSignals.map(n => BigInt(n.toString())))
+    }
+}
+
+class ReputationProof implements IReputationProof {
+  public repNullifiers: Field[]
+    public epoch: Field
+    public epochKey: Field
+    public globalStateTree: Field
+    public attesterId: Field
+    public proveReputationAmount: Field
+    public minRep: Field
+    public proveGraffiti: Field
+    public graffitiPreImage: Field
+    public proof: Field[]
+    private publicSignals: Field[]
+
+    constructor(
+        _publicSignals: Field[],
+        _proof: Field[]
+    ) {
+        this.repNullifiers = _publicSignals.slice(0, maxReputationBudget)
+        this.epoch = _publicSignals[maxReputationBudget]
+        this.epochKey = _publicSignals[maxReputationBudget + 1]
+        this.globalStateTree = _publicSignals[maxReputationBudget + 2]
+        this.attesterId = _publicSignals[maxReputationBudget + 3]
+        this.proveReputationAmount = _publicSignals[maxReputationBudget + 4]
+        this.minRep = _publicSignals[maxReputationBudget + 5]
+        this.proveGraffiti = _publicSignals[maxReputationBudget + 6]
+        this.graffitiPreImage = _publicSignals[maxReputationBudget + 7]
+        this.proof = _proof
+        this.publicSignals = _publicSignals
+    }
+
+    public verify = (): Promise<boolean> => {
+        const proof_ = formatProofForSnarkjsVerification(this.proof.map(n => n.toString()))
+        return verifyProof(Circuit.proveReputation, proof_, this.publicSignals.map(n => BigInt(n.toString())))
+    }
+}
+
+class SignUpProof implements ISignUpProof {
+    public epoch: Field
+    public epochKey: Field
+    public globalStateTree: Field
+    public attesterId: Field
+    public userHasSignedUp: Field
+    public proof: Field[]
+    private publicSignals: Field[]
+
+    constructor(
+        _publicSignals: Field[],
+        _proof: Field[]
+    ) {
+        this.epoch = _publicSignals[0]
+        this.epochKey = _publicSignals[1]
+        this.globalStateTree = _publicSignals[2]
+        this.attesterId = _publicSignals[3]
+        this.userHasSignedUp = _publicSignals[4]
+        this.proof = _proof
+        this.publicSignals = _publicSignals
+    }
+
+    public verify = (): Promise<boolean> => {
+        const proof_ = formatProofForSnarkjsVerification(this.proof.map(n => n.toString()))
+        return verifyProof(Circuit.proveUserSignUp, proof_, this.publicSignals.map(n => BigInt(n.toString())))
+    }
+}
+
+class UserTransitionProof implements IUserTransitionProof{
+    public newGlobalStateTreeLeaf: Field
+    public epkNullifiers: Field[]
+    public transitionFromEpoch: Field
+    public blindedUserStates: Field[]
+    public fromGlobalStateTree: Field
+    public blindedHashChains: Field[]
+    public fromEpochTree: Field
+    public proof: Field[]
+    private publicSignals: Field[]
+
+    constructor(
+        _publicSignals: Field[],
+        _proof: Field[]
+    ) {
+        this.newGlobalStateTreeLeaf = _publicSignals[0]
+        this.epkNullifiers = []
+        this.blindedUserStates = []
+        this.blindedHashChains = []
+        for (let i = 0; i < numEpochKeyNoncePerEpoch; i++) {
+            this.epkNullifiers.push(_publicSignals[1+i])
         }
-        const address = utils.getAddress(libraries[contractName]).toLowerCase().slice(2)
-        linkReferences[fileName][contractName].forEach(({ start: byteStart, length: byteLength }) => {
-          const start = 2 + byteStart * 2
-          const length = byteLength * 2
-          bytecode = bytecode
-            .slice(0, start)
-            .concat(address)
-            .concat(bytecode.slice(start + length, bytecode.length))
-        })
-      })
-    })
-    return bytecode
-  }
+        this.transitionFromEpoch = _publicSignals[1 + numEpochKeyNoncePerEpoch]
+        this.blindedUserStates.push(_publicSignals[2 + numEpochKeyNoncePerEpoch])
+        this.blindedUserStates.push(_publicSignals[3 + numEpochKeyNoncePerEpoch])
+        this.fromGlobalStateTree = _publicSignals[4 + numEpochKeyNoncePerEpoch]
+        for (let i = 0; i < numEpochKeyNoncePerEpoch; i++) {
+            this.blindedHashChains.push(_publicSignals[5 + numEpochKeyNoncePerEpoch + i])
+        }
+        this.fromEpochTree = _publicSignals[5 + numEpochKeyNoncePerEpoch* 2]
+        this.proof = _proof
+        this.publicSignals = _publicSignals
+    }
+
+    public verify = (): Promise<boolean> => {
+        const proof_ = formatProofForSnarkjsVerification(this.proof.map(n => n.toString()))
+        return verifyProof(Circuit.userStateTransition, proof_, this.publicSignals.map(n => BigInt(n.toString())))
+    }
+}
 
 const deployUnirep = async (
     deployer: ethers.Signer,
     _treeDepths: any,
     _settings?: any): Promise<ethers.Contract> => {
-    let PoseidonT3Contract, PoseidonT6Contract
     let EpochKeyValidityVerifierContract, StartTransitionVerifierContract, ProcessAttestationsVerifierContract, UserStateTransitionVerifierContract, ReputationVerifierContract, UserSignUpVerifierContract
-
-    console.log('Deploying PoseidonT3')
-    const PoseidonT3Factory = new ethers.ContractFactory(PoseidonT3.abi, PoseidonT3.bytecode, deployer)
-    PoseidonT3Contract = await PoseidonT3Factory.deploy()
-    await PoseidonT3Contract.deployTransaction.wait()
-    
-    console.log('Deploying PoseidonT6')
-    const PoseidonT6Factory = new ethers.ContractFactory(PoseidonT6.abi, PoseidonT6.bytecode, deployer)
-    PoseidonT6Contract = await PoseidonT6Factory.deploy()
-    await PoseidonT6Contract.deployTransaction.wait()
 
     console.log('Deploying EpochKeyValidityVerifier')
     const EpochKeyValidityVerifierFactory = new ethers.ContractFactory(EpochKeyValidityVerifier.abi, EpochKeyValidityVerifier.bytecode, deployer)
@@ -106,15 +290,7 @@ const deployUnirep = async (
         _attestingFee = attestingFee
     }
 
-    // Link libraries
-    const bytecode = linkLibraries({
-        'bytecode': Unirep.bytecode,
-        'linkReferences': Unirep.linkReferences
-    }, {
-        "PoseidonT3": PoseidonT3Contract.address,
-        "PoseidonT6": PoseidonT6Contract.address
-    })
-    const f = new ethers.ContractFactory(Unirep.abi, bytecode, deployer)
+    const f = new ethers.ContractFactory(Unirep.abi, Unirep.bytecode, deployer)
     const c = await f.deploy(
         _treeDepths,
         {
@@ -155,7 +331,20 @@ const getUnirepContract = (addressOrName: string, signerOrProvider: ethers.Signe
 }
 
 export {
+    Event,
+    AttestationEvent,
+    IAttestation,
+    IEpochKeyProof,
+    IReputationProof,
+    ISignUpProof,
+    IUserTransitionProof,
+    Attestation,
+    EpochKeyProof,
+    ReputationProof,
+    SignUpProof,
+    UserTransitionProof,
     deployUnirep,
     getUnirepContract,
     Unirep
 }
+

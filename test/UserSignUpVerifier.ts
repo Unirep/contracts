@@ -1,10 +1,11 @@
+// @ts-ignore
 import { ethers as hardhatEthers } from 'hardhat'
 import { ethers } from 'ethers'
 import { expect } from "chai"
-import { genProofAndPublicSignals, verifyProof, formatProofForVerifierContract, CircuitName } from "@unirep/circuits"
-import { genRandomSalt, hashLeftRight, genIdentity, genIdentityCommitment, IncrementalQuinTree,  stringifyBigInts, SparseMerkleTreeImpl, hashOne, } from "@unirep/crypto"
-import { circuitEpochTreeDepth, circuitGlobalStateTreeDepth, } from "../config"
-import { genEpochKey, genNewUserStateTree, getTreeDepthsForTesting, Reputation } from './utils'
+import { Circuit } from "@unirep/circuits"
+import { genRandomSalt, genIdentity, hashOne, } from "@unirep/crypto"
+import { circuitEpochTreeDepth, } from "../config"
+import { genEpochKey, genInputForContract, genProveSignUpCircuitInput, getTreeDepthsForTesting, Reputation, SignUpProof } from './utils'
 import { deployUnirep } from '../src'
 
 
@@ -15,12 +16,6 @@ describe('Verify user sign up verifier', function () {
     const epoch = 1
     const nonce = 0
     const user = genIdentity()
-    const epochKey = genEpochKey(user['identityNullifier'], epoch, nonce, circuitEpochTreeDepth)
-
-    let GSTZERO_VALUE = 0, GSTree, GSTreeRoot, GSTreeProof
-    let userStateTree: SparseMerkleTreeImpl, userStateRoot
-    let hashedLeaf
-    let results
 
     let reputationRecords = {}
     const MIN_POS_REP = 20
@@ -35,10 +30,7 @@ describe('Verify user sign up verifier', function () {
 
         const _treeDepths = getTreeDepthsForTesting()
         unirepContract = await deployUnirep(<ethers.Wallet>accounts[0], _treeDepths)
-        // User state
-        userStateTree = await genNewUserStateTree()
-
-        // Bootstrap user state
+        // Bootstrap reputation
         const graffitiPreImage = genRandomSalt()
         reputationRecords[signedUpAttesterId] = new Reputation(
             BigInt(Math.floor(Math.random() * 100) + MIN_POS_REP),
@@ -47,7 +39,6 @@ describe('Verify user sign up verifier', function () {
             BigInt(signUp)
         )
         reputationRecords[signedUpAttesterId].addGraffitiPreImage(graffitiPreImage)
-        await userStateTree.update(BigInt(signedUpAttesterId), reputationRecords[signedUpAttesterId].hash())
 
         reputationRecords[nonSignedUpAttesterId] = new Reputation(
             BigInt(Math.floor(Math.random() * 100) + MIN_POS_REP),
@@ -56,95 +47,49 @@ describe('Verify user sign up verifier', function () {
             BigInt(notSignUp)
         )
         reputationRecords[nonSignedUpAttesterId].addGraffitiPreImage(graffitiPreImage)
-        await userStateTree.update(BigInt(nonSignedUpAttesterId), reputationRecords[nonSignedUpAttesterId].hash())
-
-        userStateRoot = userStateTree.getRootHash()
-        // Global state tree
-        GSTree = new IncrementalQuinTree(circuitGlobalStateTreeDepth, GSTZERO_VALUE, 2)
-        const commitment = genIdentityCommitment(user)
-        hashedLeaf = hashLeftRight(commitment, userStateRoot)
-        GSTree.insert(hashedLeaf)
-        GSTreeProof = GSTree.genMerklePath(0)
-        GSTreeRoot = GSTree.root
     })
 
     it('successfully prove a user has signed up', async () => {
         const attesterId = signedUpAttesterId
-        const USTPathElements = await userStateTree.getMerkleProof(BigInt(attesterId))
+        const circuitInputs = await genProveSignUpCircuitInput(user, epoch, reputationRecords, attesterId)
+        const input: SignUpProof = await genInputForContract(Circuit.proveUserSignUp, circuitInputs)
 
-        const circuitInputs = {
-            epoch: epoch,
-            epoch_key: epochKey,
-            identity_pk: user['keypair']['pubKey'],
-            identity_nullifier: user['identityNullifier'], 
-            identity_trapdoor: user['identityTrapdoor'],
-            user_tree_root: userStateRoot,
-            GST_path_index: GSTreeProof.indices,
-            GST_path_elements: GSTreeProof.pathElements,
-            GST_root: GSTreeRoot,
-            attester_id: attesterId,
-            pos_rep: reputationRecords[attesterId]['posRep'],
-            neg_rep: reputationRecords[attesterId]['negRep'],
-            graffiti: reputationRecords[attesterId]['graffiti'],
-            sign_up: reputationRecords[attesterId]['signUp'],
-            UST_path_elements: USTPathElements,
-        }
-        const startTime = new Date().getTime()
-        results = await genProofAndPublicSignals(CircuitName.proveUserSignUp,stringifyBigInts(circuitInputs))
-        const endTime = new Date().getTime()
-        console.log(`Gen Proof time: ${endTime - startTime} ms (${Math.floor((endTime - startTime) / 1000)} s)`)
-        const isValid = await verifyProof(CircuitName.proveUserSignUp,results['proof'], results['publicSignals'])
-        expect(isValid).to.be.true
-
-        const isProofValid = await unirepContract.verifyUserSignUp(
-            epoch,
-            epochKey,
-            GSTreeRoot,
-            attesterId,
-            signUp,
-            formatProofForVerifierContract(results['proof']),
-        )
+        const isValid = await input.verify()
+        expect(isValid, 'Verify user sign up proof off-chain failed').to.be.true
+        const isProofValid = await unirepContract.verifyUserSignUp(input)
         expect(isProofValid, 'Verify reputation proof on-chain failed').to.be.true
     })
 
     it('wrong attesterId should fail', async () => {
+        const attesterId = signedUpAttesterId
         const wrongAttesterId = nonSignedUpAttesterId
-        const isProofValid = await unirepContract.verifyUserSignUp(
-            epoch,
-            epochKey,
-            GSTreeRoot,
-            wrongAttesterId,
-            signUp,
-            formatProofForVerifierContract(results['proof']),
-        )
+        const circuitInputs = await genProveSignUpCircuitInput(user, epoch, reputationRecords, attesterId)
+        const input: SignUpProof = await genInputForContract(Circuit.proveUserSignUp, circuitInputs)
+        input.attesterId = wrongAttesterId
+
+        const isProofValid = await unirepContract.verifyUserSignUp(input)
         expect(isProofValid, 'Verify user sign up proof on-chain should fail').to.be.false
     })
 
     it('wrong epoch should fail', async () => {
         const attesterId = signedUpAttesterId
         const wrongEpoch = epoch + 1
-        const isProofValid = await unirepContract.verifyUserSignUp(
-            wrongEpoch,
-            epochKey,
-            GSTreeRoot,
-            attesterId,
-            signUp,
-            formatProofForVerifierContract(results['proof']),
-        )
+        const circuitInputs = await genProveSignUpCircuitInput(user, epoch, reputationRecords, attesterId)
+        const input: SignUpProof = await genInputForContract(Circuit.proveUserSignUp, circuitInputs)
+        input.epoch = wrongEpoch
+
+        const isProofValid = await unirepContract.verifyUserSignUp(input)
         expect(isProofValid, 'Verify user sign up proof on-chain should fail').to.be.false
     })
 
     it('wrong epoch key should fail', async () => {
         const attesterId = signedUpAttesterId
         const wrongEpochKey = genEpochKey(user['identityNullifier'], epoch, nonce + 1, circuitEpochTreeDepth)
-        const isProofValid = await unirepContract.verifyUserSignUp(
-            epoch,
-            wrongEpochKey,
-            GSTreeRoot,
-            attesterId,
-            signUp,
-            formatProofForVerifierContract(results['proof']),
-        )
+        const circuitInputs = await genProveSignUpCircuitInput(user, epoch, reputationRecords, attesterId)
+        const input: SignUpProof = await genInputForContract(Circuit.proveUserSignUp, circuitInputs)
+        input.epochKey = wrongEpochKey
+
+        const isProofValid = await unirepContract.verifyUserSignUp(input)
         expect(isProofValid, 'Verify user sign up proof on-chain should fail').to.be.false
     })
 })

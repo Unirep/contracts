@@ -1,13 +1,12 @@
+// @ts-ignore
 import { ethers as hardhatEthers } from 'hardhat'
 import { ethers } from 'ethers'
 import { expect } from "chai"
-import { genProofAndPublicSignals, verifyProof, formatProofForVerifierContract, CircuitName } from "@unirep/circuits"
-import { genRandomSalt, hashLeftRight, genIdentity, genIdentityCommitment, IncrementalQuinTree,  stringifyBigInts, SparseMerkleTreeImpl, hashOne, } from "@unirep/crypto"
-import { circuitEpochTreeDepth, circuitGlobalStateTreeDepth, maxReputationBudget, circuitUserStateTreeDepth, attestingFee } from "../config"
-import { genEpochKey, genNewUserStateTree, getTreeDepthsForTesting, Reputation } from './utils'
-import { deployUnirep } from '../src'
-import Unirep from "../artifacts/contracts/Unirep.sol/Unirep.json"
-
+import { Circuit } from "@unirep/circuits"
+import { genRandomSalt, genIdentity, hashOne, } from "@unirep/crypto"
+import { circuitEpochTreeDepth, maxReputationBudget, circuitUserStateTreeDepth, attestingFee } from "../config"
+import { genEpochKey, genInputForContract, genReputationCircuitInput, getTreeDepthsForTesting, Reputation, ReputationProof } from './utils'
+import { deployUnirep, Unirep } from '../src'
 
 describe('Verify reputation verifier', function () {
     this.timeout(30000)
@@ -17,22 +16,13 @@ describe('Verify reputation verifier', function () {
     const epoch = 1
     const nonce = 1
     const user = genIdentity()
-    const epochKey = genEpochKey(user['identityNullifier'], epoch, nonce, circuitEpochTreeDepth)
     const NUM_ATTESTERS = 10
-
-    let GSTZERO_VALUE = 0, GSTree, GSTreeRoot, GSTreeProof
-    let userStateTree: SparseMerkleTreeImpl, userStateRoot
-    let hashedLeaf
     let attesterId
-    let results
 
     let reputationRecords = {}
     const MIN_POS_REP = 20
     const MAX_NEG_REP = 10
     const repNullifiersAmount = 3
-    const nonceStarter = 0
-    const selectors: BigInt[] = []
-    const nonceList: BigInt[] = []
     let minRep = MIN_POS_REP - MAX_NEG_REP
     const proveGraffiti = 1
     const signUp = 1
@@ -42,12 +32,10 @@ describe('Verify reputation verifier', function () {
 
         const _treeDepths = getTreeDepthsForTesting()
         unirepContract = await deployUnirep(<ethers.Wallet>accounts[0], _treeDepths)
-        // User state
-        userStateTree = await genNewUserStateTree()
-
-        // Bootstrap user state
+        
+        // Bootstrap reputation
         for (let i = 0; i < NUM_ATTESTERS; i++) {
-            let attesterId = i + 1
+            let attesterId = Math.ceil(Math.random() * (2 ** circuitUserStateTreeDepth - 1))
             while (reputationRecords[attesterId] !== undefined) attesterId = Math.floor(Math.random() * (2 ** circuitUserStateTreeDepth))
             const graffitiPreImage = genRandomSalt()
             reputationRecords[attesterId] = new Reputation(
@@ -57,227 +45,114 @@ describe('Verify reputation verifier', function () {
                 BigInt(signUp)
             )
             reputationRecords[attesterId].addGraffitiPreImage(graffitiPreImage)
-            await userStateTree.update(BigInt(attesterId), reputationRecords[attesterId].hash())
-        }
-
-        userStateRoot = userStateTree.getRootHash()
-        // Global state tree
-        GSTree = new IncrementalQuinTree(circuitGlobalStateTreeDepth, GSTZERO_VALUE, 2)
-        const commitment = genIdentityCommitment(user)
-        hashedLeaf = hashLeftRight(commitment, userStateRoot)
-        GSTree.insert(hashedLeaf)
-        GSTreeProof = GSTree.genMerklePath(0)
-        GSTreeRoot = GSTree.root
-
-        // selectors and reputation nonce
-        for (let i = 0; i < repNullifiersAmount; i++) {
-            nonceList.push( BigInt(nonceStarter + i) )
-            selectors.push(BigInt(1));
-        }
-        for (let i = repNullifiersAmount ; i < maxReputationBudget; i++) {
-            nonceList.push(BigInt(0))
-            selectors.push(BigInt(0))
         }
     })
 
     it('successfully prove a random generated reputation', async () => {
         const attesterIds = Object.keys(reputationRecords)
         attesterId = attesterIds[Math.floor(Math.random() * NUM_ATTESTERS)]
-        const USTPathElements = await userStateTree.getMerkleProof(BigInt(attesterId))
+        const circuitInputs = await genReputationCircuitInput(user, epoch, nonce, reputationRecords, attesterId, )
 
-        const circuitInputs = {
-            epoch: epoch,
-            epoch_key_nonce: nonce,
-            epoch_key: epochKey,
-            identity_pk: user['keypair']['pubKey'],
-            identity_nullifier: user['identityNullifier'], 
-            identity_trapdoor: user['identityTrapdoor'],
-            user_tree_root: userStateRoot,
-            GST_path_index: GSTreeProof.indices,
-            GST_path_elements: GSTreeProof.pathElements,
-            GST_root: GSTreeRoot,
-            attester_id: attesterId,
-            pos_rep: reputationRecords[attesterId]['posRep'],
-            neg_rep: reputationRecords[attesterId]['negRep'],
-            graffiti: reputationRecords[attesterId]['graffiti'],
-            sign_up: reputationRecords[attesterId]['signUp'],
-            UST_path_elements: USTPathElements,
-            rep_nullifiers_amount: repNullifiersAmount,
-            selectors: selectors,
-            rep_nonce: nonceList,
-            min_rep: minRep,
-            prove_graffiti: proveGraffiti,
-            graffiti_pre_image: reputationRecords[attesterId]['graffitiPreImage']
-        }
-        const startTime = new Date().getTime()
-        results = await genProofAndPublicSignals(CircuitName.proveReputation,stringifyBigInts(circuitInputs))
-        const endTime = new Date().getTime()
-        console.log(`Gen Proof time: ${endTime - startTime} ms (${Math.floor((endTime - startTime) / 1000)} s)`)
-        const isValid = await verifyProof(CircuitName.proveReputation,results['proof'], results['publicSignals'])
-        expect(isValid).to.be.true
-
-        const isProofValid = await unirepContract.verifyReputation(
-            results['publicSignals'].slice(0, maxReputationBudget),
-            epoch,
-            epochKey,
-            GSTreeRoot,
-            attesterId,
-            repNullifiersAmount,
-            minRep,
-            proveGraffiti,
-            reputationRecords[attesterId]['graffitiPreImage'],
-            formatProofForVerifierContract(results['proof']),
-        )
+        const input: ReputationProof = await genInputForContract(Circuit.proveReputation, circuitInputs)
+        const isValid = await input.verify()
+        expect(isValid, 'Verify reputation proof off-chain failed').to.be.true
+        const isProofValid = await unirepContract.verifyReputation(input)
         expect(isProofValid, 'Verify reputation proof on-chain failed').to.be.true
     })
 
     it('mismatched reputation nullifiers and nullifiers amount should fail', async () => {
         const wrongReputationNullifierAmount = repNullifiersAmount + 1
+        const invalidCircuitInputs = await genReputationCircuitInput(user, epoch, nonce, reputationRecords, attesterId, repNullifiersAmount )
+        invalidCircuitInputs.rep_nullifiers_amount = wrongReputationNullifierAmount
 
-        const isProofValid = await unirepContract.verifyReputation(
-            results['publicSignals'].slice(0, maxReputationBudget),
-            epoch,
-            epochKey,
-            GSTreeRoot,
-            attesterId,
-            wrongReputationNullifierAmount,
-            minRep,
-            proveGraffiti,
-            reputationRecords[attesterId]['graffitiPreImage'],
-            formatProofForVerifierContract(results['proof']),
-        )
+        const input: ReputationProof = await genInputForContract(Circuit.proveReputation, invalidCircuitInputs)
+        const isValid = await input.verify()
+        expect(isValid, 'Verify reputation proof off-chain should fail').to.be.false
+        const isProofValid = await unirepContract.verifyReputation(input)
         expect(isProofValid, 'Verify reputation proof on-chain should fail').to.be.false
     })
 
     it('wrong nullifiers should fail', async () => {
-        const wrongReputationNullifiers: BigInt[] = []
-        for (let i = 0; i < maxReputationBudget; i++) {
-            wrongReputationNullifiers.push(genRandomSalt())
-        }
+        const circuitInputs = await genReputationCircuitInput(user, epoch, nonce, reputationRecords, attesterId, repNullifiersAmount )
 
-        const isProofValid = await unirepContract.verifyReputation(
-            wrongReputationNullifiers,
-            epoch,
-            epochKey,
-            GSTreeRoot,
-            attesterId,
-            repNullifiersAmount,
-            minRep,
-            proveGraffiti,
-            reputationRecords[attesterId]['graffitiPreImage'],
-            formatProofForVerifierContract(results['proof']),
-        )
+        let input: ReputationProof = await genInputForContract(Circuit.proveReputation, circuitInputs)
+        // random reputation nullifiers
+        for (let i = 0; i < maxReputationBudget; i++) {
+            input.repNullifiers[i] = genRandomSalt()
+        }
+        const isProofValid = await unirepContract.verifyReputation(input)
         expect(isProofValid, 'Verify reputation proof on-chain should fail').to.be.false
     })
 
     it('wrong epoch should fail', async () => {
         const wrongEpoch = epoch + 1
-        const isProofValid = await unirepContract.verifyReputation(
-            results['publicSignals'].slice(0, maxReputationBudget),
-            wrongEpoch,
-            epochKey,
-            GSTreeRoot,
-            attesterId,
-            repNullifiersAmount,
-            minRep,
-            proveGraffiti,
-            reputationRecords[attesterId]['graffitiPreImage'],
-            formatProofForVerifierContract(results['proof']),
-        )
+        const circuitInputs = await genReputationCircuitInput(user, epoch, nonce, reputationRecords, attesterId, repNullifiersAmount )
+
+        const input: ReputationProof = await genInputForContract(Circuit.proveReputation, circuitInputs)
+        input.epoch = wrongEpoch
+        const isProofValid = await unirepContract.verifyReputation(input)
         expect(isProofValid, 'Verify reputation proof on-chain should fail').to.be.false
     })
 
-    it('wrong epoch epoch should fail', async () => {
+    it('wrong nonce epoch key should fail', async () => {
         const wrongEpochKey = genEpochKey(user['identityNullifier'], epoch, nonce + 1, circuitEpochTreeDepth)
-        const isProofValid = await unirepContract.verifyReputation(
-            results['publicSignals'].slice(0, maxReputationBudget),
-            epoch,
-            wrongEpochKey,
-            GSTreeRoot,
-            attesterId,
-            repNullifiersAmount,
-            minRep,
-            proveGraffiti,
-            reputationRecords[attesterId]['graffitiPreImage'],
-            formatProofForVerifierContract(results['proof']),
-        )
+        const circuitInputs = await genReputationCircuitInput(user, epoch, nonce, reputationRecords, attesterId, repNullifiersAmount )
+
+        const input: ReputationProof = await genInputForContract(Circuit.proveReputation, circuitInputs)
+        input.epochKey = wrongEpochKey
+        const isProofValid = await unirepContract.verifyReputation(input)
         expect(isProofValid, 'Verify reputation proof on-chain should fail').to.be.false
     })
 
     it('wrong attesterId should fail', async () => {
         const wrongAttesterId = attesterId + 1
-        const isProofValid = await unirepContract.verifyReputation(
-            results['publicSignals'].slice(0, maxReputationBudget),
-            epoch,
-            epochKey,
-            GSTreeRoot,
-            wrongAttesterId,
-            repNullifiersAmount,
-            minRep,
-            proveGraffiti,
-            reputationRecords[attesterId]['graffitiPreImage'],
-            formatProofForVerifierContract(results['proof']),
-        )
+        const circuitInputs = await genReputationCircuitInput(user, epoch, nonce, reputationRecords, attesterId, repNullifiersAmount )
+
+        const input: ReputationProof = await genInputForContract(Circuit.proveReputation, circuitInputs)
+        input.attesterId = wrongAttesterId
+        const isProofValid = await unirepContract.verifyReputation(input)
         expect(isProofValid, 'Verify reputation proof on-chain should fail').to.be.false
     })
 
     it('wrong minRep should fail', async () => {
         const wrongMinRep = minRep + 1
-        const isProofValid = await unirepContract.verifyReputation(
-            results['publicSignals'].slice(0, maxReputationBudget),
-            epoch,
-            epochKey,
-            GSTreeRoot,
-            attesterId,
-            repNullifiersAmount,
-            wrongMinRep,
-            proveGraffiti,
-            reputationRecords[attesterId]['graffitiPreImage'],
-            formatProofForVerifierContract(results['proof']),
-        )
+        const circuitInputs = await genReputationCircuitInput(user, epoch, nonce, reputationRecords, attesterId, repNullifiersAmount, minRep )
+
+        const input: ReputationProof = await genInputForContract(Circuit.proveReputation, circuitInputs)
+        input.minRep = wrongMinRep
+        const isProofValid = await unirepContract.verifyReputation(input)
         expect(isProofValid, 'Verify reputation proof on-chain should fail').to.be.false
     })
 
     it('wrong graffiti preimage should fail', async () => {
         const wrongGraffitiPreimage = genRandomSalt()
-        const isProofValid = await unirepContract.verifyReputation(
-            results['publicSignals'].slice(0, maxReputationBudget),
-            epoch,
-            epochKey,
-            GSTreeRoot,
-            attesterId,
-            repNullifiersAmount,
-            minRep,
-            proveGraffiti,
-            wrongGraffitiPreimage,
-            formatProofForVerifierContract(results['proof']),
-        )
+        const circuitInputs = await genReputationCircuitInput(user, epoch, nonce, reputationRecords, attesterId, repNullifiersAmount, minRep , proveGraffiti, )
+
+        const input: ReputationProof = await genInputForContract(Circuit.proveReputation, circuitInputs)
+        input.graffitiPreImage = wrongGraffitiPreimage
+        const isProofValid = await unirepContract.verifyReputation(input)
         expect(isProofValid, 'Verify reputation proof on-chain should fail').to.be.false
     })
 
     it('sign up should succeed', async () => {
         const attester = accounts[1]
         const attesterAddress = await attester.getAddress()
-        unirepContractCalledByAttester = await hardhatEthers.getContractAt(Unirep.abi, unirepContract.address, attester)
+        unirepContractCalledByAttester = await hardhatEthers.getContractAt(
+            Unirep.abi, 
+            unirepContract.address, 
+            attester
+        )
         const tx = await unirepContractCalledByAttester.attesterSignUp()
         const receipt = await tx.wait()
         expect(receipt.status).equal(1)
-        attesterId = await unirepContract.attesters(attesterAddress)
+        attesterId = BigInt(await unirepContract.attesters(attesterAddress))
     })
 
     it('submit reputation nullifiers should succeed', async () => {
-        const tx = await unirepContractCalledByAttester.spendReputation([
-            results['publicSignals'].slice(0, maxReputationBudget),
-            epoch,
-            epochKey,
-            GSTreeRoot,
-            attesterId,
-            repNullifiersAmount,
-            minRep,
-            proveGraffiti,
-            reputationRecords[attesterId]['graffitiPreImage'],
-            formatProofForVerifierContract(results['proof'])
-            ],
+        const circuitInputs = await genReputationCircuitInput(user, epoch, nonce, reputationRecords, attesterId, repNullifiersAmount, minRep , proveGraffiti, )
+        const input: ReputationProof = await genInputForContract(Circuit.proveReputation, circuitInputs)
+        const tx = await unirepContractCalledByAttester.spendReputation(
+            input,
             {value: attestingFee},
         )
         const receipt = await tx.wait()
@@ -285,19 +160,12 @@ describe('Verify reputation verifier', function () {
     })
 
     it('submit reputation nullifiers with wrong length of nullifiers should fail', async () => {
-        const wrongNullifiers = results['publicSignals'].slice(1, maxReputationBudget)
-        await expect(unirepContractCalledByAttester.spendReputation([
-            wrongNullifiers,
-            epoch,
-            epochKey,
-            GSTreeRoot,
-            attesterId,
-            repNullifiersAmount,
-            minRep,
-            proveGraffiti,
-            reputationRecords[attesterId]['graffitiPreImage'],
-            formatProofForVerifierContract(results['proof'])
-            ],
+        const circuitInputs = await genReputationCircuitInput(user, epoch, nonce, reputationRecords, attesterId, repNullifiersAmount, minRep , proveGraffiti, )
+        const input: ReputationProof = await genInputForContract(Circuit.proveReputation, circuitInputs)
+        const wrongNullifiers = input.repNullifiers.slice(1, maxReputationBudget)
+        input.repNullifiers = wrongNullifiers
+        await expect(unirepContractCalledByAttester.spendReputation(
+            input,
             {value: attestingFee},
         )).to.be.revertedWith('Unirep: invalid number of reputation nullifiers')
     })

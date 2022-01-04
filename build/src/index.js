@@ -3,8 +3,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Unirep = exports.getUnirepContract = exports.deployUnirep = void 0;
+exports.Unirep = exports.getUnirepContract = exports.deployUnirep = exports.UserTransitionProof = exports.SignUpProof = exports.ReputationProof = exports.EpochKeyProof = exports.Attestation = exports.AttestationEvent = exports.Event = void 0;
 const ethers_1 = require("ethers");
+const circuits_1 = require("@unirep/circuits");
 const config_1 = require("../config");
 const Unirep_json_1 = __importDefault(require("../artifacts/contracts/Unirep.sol/Unirep.json"));
 exports.Unirep = Unirep_json_1.default;
@@ -14,38 +15,120 @@ const UserSignUpVerifier_json_1 = __importDefault(require("../artifacts/contract
 const StartTransitionVerifier_json_1 = __importDefault(require("../artifacts/contracts/StartTransitionVerifier.sol/StartTransitionVerifier.json"));
 const UserStateTransitionVerifier_json_1 = __importDefault(require("../artifacts/contracts/UserStateTransitionVerifier.sol/UserStateTransitionVerifier.json"));
 const ProcessAttestationsVerifier_json_1 = __importDefault(require("../artifacts/contracts/ProcessAttestationsVerifier.sol/ProcessAttestationsVerifier.json"));
-const PoseidonT3_json_1 = __importDefault(require("../artifacts/contracts/Poseidon.sol/PoseidonT3.json"));
-const PoseidonT6_json_1 = __importDefault(require("../artifacts/contracts/Poseidon.sol/PoseidonT6.json"));
-const linkLibraries = ({ bytecode, linkReferences, }, libraries) => {
-    Object.keys(linkReferences).forEach((fileName) => {
-        Object.keys(linkReferences[fileName]).forEach((contractName) => {
-            if (!libraries.hasOwnProperty(contractName)) {
-                throw new Error(`Missing link library name ${contractName}`);
-            }
-            const address = ethers_1.utils.getAddress(libraries[contractName]).toLowerCase().slice(2);
-            linkReferences[fileName][contractName].forEach(({ start: byteStart, length: byteLength }) => {
-                const start = 2 + byteStart * 2;
-                const length = byteLength * 2;
-                bytecode = bytecode
-                    .slice(0, start)
-                    .concat(address)
-                    .concat(bytecode.slice(start + length, bytecode.length));
-            });
-        });
-    });
-    return bytecode;
-};
+const crypto_1 = require("@unirep/crypto");
+var Event;
+(function (Event) {
+    Event[Event["UserSignedUp"] = 0] = "UserSignedUp";
+    Event[Event["UserStateTransitioned"] = 1] = "UserStateTransitioned";
+    Event[Event["AttestationSubmitted"] = 2] = "AttestationSubmitted";
+    Event[Event["EpochEnded"] = 3] = "EpochEnded";
+})(Event || (Event = {}));
+exports.Event = Event;
+var AttestationEvent;
+(function (AttestationEvent) {
+    AttestationEvent[AttestationEvent["SendAttestation"] = 0] = "SendAttestation";
+    AttestationEvent[AttestationEvent["Airdrop"] = 1] = "Airdrop";
+    AttestationEvent[AttestationEvent["SpendReputation"] = 2] = "SpendReputation";
+})(AttestationEvent || (AttestationEvent = {}));
+exports.AttestationEvent = AttestationEvent;
+class Attestation {
+    constructor(_attesterId, _posRep, _negRep, _graffiti, _signUp) {
+        this.hash = () => {
+            return (0, crypto_1.hash5)([
+                this.attesterId,
+                this.posRep,
+                this.negRep,
+                this.graffiti,
+                this.signUp,
+            ]);
+        };
+        this.attesterId = _attesterId;
+        this.posRep = _posRep;
+        this.negRep = _negRep;
+        this.graffiti = _graffiti;
+        this.signUp = _signUp;
+    }
+}
+exports.Attestation = Attestation;
+// the struct EpochKeyProof in UnirepObjs
+class EpochKeyProof {
+    constructor(_publicSignals, _proof) {
+        this.verify = () => {
+            const proof_ = (0, circuits_1.formatProofForSnarkjsVerification)(this.proof.map(n => n.toString()));
+            return (0, circuits_1.verifyProof)(circuits_1.Circuit.verifyEpochKey, proof_, this.publicSignals.map(n => BigInt(n.toString())));
+        };
+        this.globalStateTree = _publicSignals[0];
+        this.epoch = _publicSignals[1];
+        this.epochKey = _publicSignals[2];
+        this.proof = _proof;
+        this.publicSignals = _publicSignals;
+    }
+}
+exports.EpochKeyProof = EpochKeyProof;
+class ReputationProof {
+    constructor(_publicSignals, _proof) {
+        this.verify = () => {
+            const proof_ = (0, circuits_1.formatProofForSnarkjsVerification)(this.proof.map(n => n.toString()));
+            return (0, circuits_1.verifyProof)(circuits_1.Circuit.proveReputation, proof_, this.publicSignals.map(n => BigInt(n.toString())));
+        };
+        this.repNullifiers = _publicSignals.slice(0, config_1.maxReputationBudget);
+        this.epoch = _publicSignals[config_1.maxReputationBudget];
+        this.epochKey = _publicSignals[config_1.maxReputationBudget + 1];
+        this.globalStateTree = _publicSignals[config_1.maxReputationBudget + 2];
+        this.attesterId = _publicSignals[config_1.maxReputationBudget + 3];
+        this.proveReputationAmount = _publicSignals[config_1.maxReputationBudget + 4];
+        this.minRep = _publicSignals[config_1.maxReputationBudget + 5];
+        this.proveGraffiti = _publicSignals[config_1.maxReputationBudget + 6];
+        this.graffitiPreImage = _publicSignals[config_1.maxReputationBudget + 7];
+        this.proof = _proof;
+        this.publicSignals = _publicSignals;
+    }
+}
+exports.ReputationProof = ReputationProof;
+class SignUpProof {
+    constructor(_publicSignals, _proof) {
+        this.verify = () => {
+            const proof_ = (0, circuits_1.formatProofForSnarkjsVerification)(this.proof.map(n => n.toString()));
+            return (0, circuits_1.verifyProof)(circuits_1.Circuit.proveUserSignUp, proof_, this.publicSignals.map(n => BigInt(n.toString())));
+        };
+        this.epoch = _publicSignals[0];
+        this.epochKey = _publicSignals[1];
+        this.globalStateTree = _publicSignals[2];
+        this.attesterId = _publicSignals[3];
+        this.userHasSignedUp = _publicSignals[4];
+        this.proof = _proof;
+        this.publicSignals = _publicSignals;
+    }
+}
+exports.SignUpProof = SignUpProof;
+class UserTransitionProof {
+    constructor(_publicSignals, _proof) {
+        this.verify = () => {
+            const proof_ = (0, circuits_1.formatProofForSnarkjsVerification)(this.proof.map(n => n.toString()));
+            return (0, circuits_1.verifyProof)(circuits_1.Circuit.userStateTransition, proof_, this.publicSignals.map(n => BigInt(n.toString())));
+        };
+        this.newGlobalStateTreeLeaf = _publicSignals[0];
+        this.epkNullifiers = [];
+        this.blindedUserStates = [];
+        this.blindedHashChains = [];
+        for (let i = 0; i < config_1.numEpochKeyNoncePerEpoch; i++) {
+            this.epkNullifiers.push(_publicSignals[1 + i]);
+        }
+        this.transitionFromEpoch = _publicSignals[1 + config_1.numEpochKeyNoncePerEpoch];
+        this.blindedUserStates.push(_publicSignals[2 + config_1.numEpochKeyNoncePerEpoch]);
+        this.blindedUserStates.push(_publicSignals[3 + config_1.numEpochKeyNoncePerEpoch]);
+        this.fromGlobalStateTree = _publicSignals[4 + config_1.numEpochKeyNoncePerEpoch];
+        for (let i = 0; i < config_1.numEpochKeyNoncePerEpoch; i++) {
+            this.blindedHashChains.push(_publicSignals[5 + config_1.numEpochKeyNoncePerEpoch + i]);
+        }
+        this.fromEpochTree = _publicSignals[5 + config_1.numEpochKeyNoncePerEpoch * 2];
+        this.proof = _proof;
+        this.publicSignals = _publicSignals;
+    }
+}
+exports.UserTransitionProof = UserTransitionProof;
 const deployUnirep = async (deployer, _treeDepths, _settings) => {
-    let PoseidonT3Contract, PoseidonT6Contract;
     let EpochKeyValidityVerifierContract, StartTransitionVerifierContract, ProcessAttestationsVerifierContract, UserStateTransitionVerifierContract, ReputationVerifierContract, UserSignUpVerifierContract;
-    console.log('Deploying PoseidonT3');
-    const PoseidonT3Factory = new ethers_1.ethers.ContractFactory(PoseidonT3_json_1.default.abi, PoseidonT3_json_1.default.bytecode, deployer);
-    PoseidonT3Contract = await PoseidonT3Factory.deploy();
-    await PoseidonT3Contract.deployTransaction.wait();
-    console.log('Deploying PoseidonT6');
-    const PoseidonT6Factory = new ethers_1.ethers.ContractFactory(PoseidonT6_json_1.default.abi, PoseidonT6_json_1.default.bytecode, deployer);
-    PoseidonT6Contract = await PoseidonT6Factory.deploy();
-    await PoseidonT6Contract.deployTransaction.wait();
     console.log('Deploying EpochKeyValidityVerifier');
     const EpochKeyValidityVerifierFactory = new ethers_1.ethers.ContractFactory(EpochKeyValidityVerifier_json_1.default.abi, EpochKeyValidityVerifier_json_1.default.bytecode, deployer);
     EpochKeyValidityVerifierContract = await EpochKeyValidityVerifierFactory.deploy();
@@ -88,15 +171,7 @@ const deployUnirep = async (deployer, _treeDepths, _settings) => {
             _epochLength = config_1.epochLength;
         _attestingFee = config_1.attestingFee;
     }
-    // Link libraries
-    const bytecode = linkLibraries({
-        'bytecode': Unirep_json_1.default.bytecode,
-        'linkReferences': Unirep_json_1.default.linkReferences
-    }, {
-        "PoseidonT3": PoseidonT3Contract.address,
-        "PoseidonT6": PoseidonT6Contract.address
-    });
-    const f = new ethers_1.ethers.ContractFactory(Unirep_json_1.default.abi, bytecode, deployer);
+    const f = new ethers_1.ethers.ContractFactory(Unirep_json_1.default.abi, Unirep_json_1.default.bytecode, deployer);
     const c = await f.deploy(_treeDepths, {
         "maxUsers": _maxUsers,
         "maxAttesters": _maxAttesters,
