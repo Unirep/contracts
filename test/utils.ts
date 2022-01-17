@@ -25,12 +25,13 @@ export class EpochKeyProof {
 
     constructor(
         _publicSignals: Field[],
-        _proof: Field[]
+        _proof: SnarkProof
     ) {
+        const formattedProof: any[] = formatProofForVerifierContract(_proof)
         this.globalStateTree = _publicSignals[0]
         this.epoch = _publicSignals[1]
         this.epochKey = _publicSignals[2]
-        this.proof = _proof
+        this.proof = formattedProof
         this.publicSignals = _publicSignals
     }
 
@@ -69,8 +70,9 @@ export class ReputationProof implements IReputationProof {
 
     constructor(
         _publicSignals: Field[],
-        _proof: Field[]
+        _proof: SnarkProof
     ) {
+        const formattedProof: any[] = formatProofForVerifierContract(_proof)
         this.repNullifiers = _publicSignals.slice(0, maxReputationBudget)
         this.epoch = _publicSignals[maxReputationBudget]
         this.epochKey = _publicSignals[maxReputationBudget + 1]
@@ -80,7 +82,7 @@ export class ReputationProof implements IReputationProof {
         this.minRep = _publicSignals[maxReputationBudget + 5]
         this.proveGraffiti = _publicSignals[maxReputationBudget + 6]
         this.graffitiPreImage = _publicSignals[maxReputationBudget + 7]
-        this.proof = _proof
+        this.proof = formattedProof
         this.publicSignals = _publicSignals
     }
 
@@ -111,14 +113,15 @@ export class SignUpProof implements ISignUpProof{
 
     constructor(
         _publicSignals: Field[],
-        _proof: Field[]
+        _proof: SnarkProof
     ) {
+        const formattedProof: any[] = formatProofForVerifierContract(_proof)
         this.epoch = _publicSignals[0]
         this.epochKey = _publicSignals[1]
         this.globalStateTree = _publicSignals[2]
         this.attesterId = _publicSignals[3]
         this.userHasSignedUp = _publicSignals[4]
-        this.proof = _proof
+        this.proof = formattedProof
         this.publicSignals = _publicSignals
     }
 
@@ -153,8 +156,9 @@ export class UserTransitionProof implements IUserTransitionProof{
 
     constructor(
         _publicSignals: Field[],
-        _proof: Field[]
+        _proof: SnarkProof
     ) {
+        const formattedProof: any[] = formatProofForVerifierContract(_proof)
         this.newGlobalStateTreeLeaf = _publicSignals[0]
         this.epkNullifiers = []
         this.blindedUserStates = []
@@ -170,7 +174,7 @@ export class UserTransitionProof implements IUserTransitionProof{
             this.blindedHashChains.push(_publicSignals[5 + numEpochKeyNoncePerEpoch + i])
         }
         this.fromEpochTree = _publicSignals[5 + numEpochKeyNoncePerEpoch* 2]
-        this.proof = _proof
+        this.proof = formattedProof
         this.publicSignals = _publicSignals
     }
 
@@ -744,14 +748,14 @@ const genProveSignUpCircuitInput = async (id: Identity, epoch: number, reputatio
 }
 
 const formatProofAndPublicSignals = (circuit: Circuit, proof: SnarkProof, publicSignals: any[]) => {
-    const formattedProof: any[] = formatProofForVerifierContract(proof)
     let result 
+    const formattedProof: any[] = formatProofForVerifierContract(proof)
     if (circuit === Circuit.proveReputation) {
-        result = new ReputationProof(publicSignals, formattedProof)
+        result = new ReputationProof(publicSignals, proof)
     } else if(circuit === Circuit.verifyEpochKey) {
-        result = new EpochKeyProof(publicSignals, formattedProof)
+        result = new EpochKeyProof(publicSignals, proof)
     } else if (circuit === Circuit.proveUserSignUp) {
-        result = new SignUpProof(publicSignals, formattedProof)
+        result = new SignUpProof(publicSignals, proof)
     } else if (circuit === Circuit.startTransition) {
         result = { 
             blindedUserState: publicSignals[0], 
@@ -767,7 +771,7 @@ const formatProofAndPublicSignals = (circuit: Circuit, proof: SnarkProof, public
             proof: formattedProof
         }
     } else if (circuit === Circuit.userStateTransition) {
-        result = new UserTransitionProof(publicSignals, formattedProof)
+        result = new UserTransitionProof(publicSignals, proof)
     } else {
         result = publicSignals.concat([formattedProof])
     }

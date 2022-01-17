@@ -57,10 +57,11 @@ class EpochKeyProof {
             const proof_ = (0, circuits_1.formatProofForSnarkjsVerification)(this.proof.map(n => n.toString()));
             return (0, circuits_1.verifyProof)(circuits_1.Circuit.verifyEpochKey, proof_, this.publicSignals.map(n => BigInt(n.toString())));
         };
+        const formattedProof = (0, circuits_1.formatProofForVerifierContract)(_proof);
         this.globalStateTree = _publicSignals[0];
         this.epoch = _publicSignals[1];
         this.epochKey = _publicSignals[2];
-        this.proof = _proof;
+        this.proof = formattedProof;
         this.publicSignals = _publicSignals;
     }
 }
@@ -71,6 +72,7 @@ class ReputationProof {
             const proof_ = (0, circuits_1.formatProofForSnarkjsVerification)(this.proof.map(n => n.toString()));
             return (0, circuits_1.verifyProof)(circuits_1.Circuit.proveReputation, proof_, this.publicSignals.map(n => BigInt(n.toString())));
         };
+        const formattedProof = (0, circuits_1.formatProofForVerifierContract)(_proof);
         this.repNullifiers = _publicSignals.slice(0, config_1.maxReputationBudget);
         this.epoch = _publicSignals[config_1.maxReputationBudget];
         this.epochKey = _publicSignals[config_1.maxReputationBudget + 1];
@@ -80,7 +82,7 @@ class ReputationProof {
         this.minRep = _publicSignals[config_1.maxReputationBudget + 5];
         this.proveGraffiti = _publicSignals[config_1.maxReputationBudget + 6];
         this.graffitiPreImage = _publicSignals[config_1.maxReputationBudget + 7];
-        this.proof = _proof;
+        this.proof = formattedProof;
         this.publicSignals = _publicSignals;
     }
 }
@@ -91,12 +93,13 @@ class SignUpProof {
             const proof_ = (0, circuits_1.formatProofForSnarkjsVerification)(this.proof.map(n => n.toString()));
             return (0, circuits_1.verifyProof)(circuits_1.Circuit.proveUserSignUp, proof_, this.publicSignals.map(n => BigInt(n.toString())));
         };
+        const formattedProof = (0, circuits_1.formatProofForVerifierContract)(_proof);
         this.epoch = _publicSignals[0];
         this.epochKey = _publicSignals[1];
         this.globalStateTree = _publicSignals[2];
         this.attesterId = _publicSignals[3];
         this.userHasSignedUp = _publicSignals[4];
-        this.proof = _proof;
+        this.proof = formattedProof;
         this.publicSignals = _publicSignals;
     }
 }
@@ -107,6 +110,7 @@ class UserTransitionProof {
             const proof_ = (0, circuits_1.formatProofForSnarkjsVerification)(this.proof.map(n => n.toString()));
             return (0, circuits_1.verifyProof)(circuits_1.Circuit.userStateTransition, proof_, this.publicSignals.map(n => BigInt(n.toString())));
         };
+        const formattedProof = (0, circuits_1.formatProofForVerifierContract)(_proof);
         this.newGlobalStateTreeLeaf = _publicSignals[0];
         this.epkNullifiers = [];
         this.blindedUserStates = [];
@@ -122,7 +126,7 @@ class UserTransitionProof {
             this.blindedHashChains.push(_publicSignals[5 + config_1.numEpochKeyNoncePerEpoch + i]);
         }
         this.fromEpochTree = _publicSignals[5 + config_1.numEpochKeyNoncePerEpoch * 2];
-        this.proof = _proof;
+        this.proof = formattedProof;
         this.publicSignals = _publicSignals;
     }
 }

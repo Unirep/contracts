@@ -1,5 +1,5 @@
 import { ethers } from 'ethers'
-import { Circuit, formatProofForSnarkjsVerification, verifyProof } from '@unirep/circuits'
+import { Circuit, formatProofForSnarkjsVerification, formatProofForVerifierContract, verifyProof } from '@unirep/circuits'
 import { maxUsers, maxAttesters, numEpochKeyNoncePerEpoch, epochLength, attestingFee, maxReputationBudget } from '../config'
 
 import Unirep from "../artifacts/contracts/Unirep.sol/Unirep.json"
@@ -9,7 +9,7 @@ import UserSignUpVerifier from "../artifacts/contracts/UserSignUpVerifier.sol/Us
 import StartTransitionVerifier from "../artifacts/contracts/StartTransitionVerifier.sol/StartTransitionVerifier.json"
 import UserStateTransitionVerifier from "../artifacts/contracts/UserStateTransitionVerifier.sol/UserStateTransitionVerifier.json"
 import ProcessAttestationsVerifier from "../artifacts/contracts/ProcessAttestationsVerifier.sol/ProcessAttestationsVerifier.json"
-import { hash5 } from '@unirep/crypto'
+import { hash5, SnarkProof } from '@unirep/crypto'
 
 export type Field = BigInt | string | number | ethers.BigNumber
 
@@ -117,12 +117,13 @@ class EpochKeyProof implements IEpochKeyProof {
 
     constructor(
         _publicSignals: Field[],
-        _proof: Field[]
+        _proof: SnarkProof
     ) {
+        const formattedProof: any[] = formatProofForVerifierContract(_proof)
         this.globalStateTree = _publicSignals[0]
         this.epoch = _publicSignals[1]
         this.epochKey = _publicSignals[2]
-        this.proof = _proof
+        this.proof = formattedProof
         this.publicSignals = _publicSignals
     }
 
@@ -147,8 +148,9 @@ class ReputationProof implements IReputationProof {
 
     constructor(
         _publicSignals: Field[],
-        _proof: Field[]
+        _proof: SnarkProof
     ) {
+        const formattedProof: any[] = formatProofForVerifierContract(_proof)
         this.repNullifiers = _publicSignals.slice(0, maxReputationBudget)
         this.epoch = _publicSignals[maxReputationBudget]
         this.epochKey = _publicSignals[maxReputationBudget + 1]
@@ -158,7 +160,7 @@ class ReputationProof implements IReputationProof {
         this.minRep = _publicSignals[maxReputationBudget + 5]
         this.proveGraffiti = _publicSignals[maxReputationBudget + 6]
         this.graffitiPreImage = _publicSignals[maxReputationBudget + 7]
-        this.proof = _proof
+        this.proof = formattedProof
         this.publicSignals = _publicSignals
     }
 
@@ -179,14 +181,15 @@ class SignUpProof implements ISignUpProof {
 
     constructor(
         _publicSignals: Field[],
-        _proof: Field[]
+        _proof: SnarkProof
     ) {
+        const formattedProof: any[] = formatProofForVerifierContract(_proof)
         this.epoch = _publicSignals[0]
         this.epochKey = _publicSignals[1]
         this.globalStateTree = _publicSignals[2]
         this.attesterId = _publicSignals[3]
         this.userHasSignedUp = _publicSignals[4]
-        this.proof = _proof
+        this.proof = formattedProof
         this.publicSignals = _publicSignals
     }
 
@@ -209,8 +212,9 @@ class UserTransitionProof implements IUserTransitionProof{
 
     constructor(
         _publicSignals: Field[],
-        _proof: Field[]
+        _proof: SnarkProof
     ) {
+        const formattedProof: any[] = formatProofForVerifierContract(_proof)
         this.newGlobalStateTreeLeaf = _publicSignals[0]
         this.epkNullifiers = []
         this.blindedUserStates = []
@@ -226,7 +230,7 @@ class UserTransitionProof implements IUserTransitionProof{
             this.blindedHashChains.push(_publicSignals[5 + numEpochKeyNoncePerEpoch + i])
         }
         this.fromEpochTree = _publicSignals[5 + numEpochKeyNoncePerEpoch* 2]
-        this.proof = _proof
+        this.proof = formattedProof
         this.publicSignals = _publicSignals
     }
 

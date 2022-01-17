@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
 import Unirep from "../artifacts/contracts/Unirep.sol/Unirep.json";
+import { SnarkProof } from '@unirep/crypto';
 export declare type Field = BigInt | string | number | ethers.BigNumber;
 declare enum Event {
     UserSignedUp = 0,
@@ -71,7 +72,7 @@ declare class EpochKeyProof implements IEpochKeyProof {
     epochKey: Field;
     proof: Field[];
     private publicSignals;
-    constructor(_publicSignals: Field[], _proof: Field[]);
+    constructor(_publicSignals: Field[], _proof: SnarkProof);
     verify: () => Promise<boolean>;
 }
 declare class ReputationProof implements IReputationProof {
@@ -86,7 +87,7 @@ declare class ReputationProof implements IReputationProof {
     graffitiPreImage: Field;
     proof: Field[];
     private publicSignals;
-    constructor(_publicSignals: Field[], _proof: Field[]);
+    constructor(_publicSignals: Field[], _proof: SnarkProof);
     verify: () => Promise<boolean>;
 }
 declare class SignUpProof implements ISignUpProof {
@@ -97,7 +98,7 @@ declare class SignUpProof implements ISignUpProof {
     userHasSignedUp: Field;
     proof: Field[];
     private publicSignals;
-    constructor(_publicSignals: Field[], _proof: Field[]);
+    constructor(_publicSignals: Field[], _proof: SnarkProof);
     verify: () => Promise<boolean>;
 }
 declare class UserTransitionProof implements IUserTransitionProof {
@@ -110,7 +111,7 @@ declare class UserTransitionProof implements IUserTransitionProof {
     fromEpochTree: Field;
     proof: Field[];
     private publicSignals;
-    constructor(_publicSignals: Field[], _proof: Field[]);
+    constructor(_publicSignals: Field[], _proof: SnarkProof);
     verify: () => Promise<boolean>;
 }
 declare const deployUnirep: (deployer: ethers.Signer, _treeDepths: any, _settings?: any) => Promise<ethers.Contract>;
