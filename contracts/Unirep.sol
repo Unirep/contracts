@@ -48,12 +48,6 @@ contract Unirep is SnarkConstants, Hasher {
 
     uint256 public latestEpochTransitionTime;
 
-    // To store the Merkle root of a tree with 2 **
-    // treeDepths.userStateTreeDepth leaves of value 0
-    // uint256 public emptyUserStateRoot;
-
-    // uint256 immutable public emptyGlobalStateTreeRoot;
-
     // Maximum number of epoch keys allowed for an user to generate in one epoch
     uint8 immutable public numEpochKeyNoncePerEpoch;
 
@@ -216,13 +210,6 @@ contract Unirep is SnarkConstants, Hasher {
         require(_maxValues.maxAttesters <= USTMaxLeafIndex, "Unirep: invalid maxAttesters value");
         maxAttesters = _maxValues.maxAttesters;
 
-        // Calculate and store the empty user state tree root. This value must
-        // be set before we compute empty global state tree root later
-        // emptyUserStateRoot = calcEmptyUserStateTreeRoot(_treeDepths.userStateTreeDepth);
-        // emptyGlobalStateTreeRoot = calcEmptyGlobalStateTreeRoot(_treeDepths.globalStateTreeDepth);
-        // emptyUserStateRoot = _emptyUserStateRoot;
-        // emptyGlobalStateTreeRoot = _emptyGlobalStateTreeRoot;
-
         attestingFee = _attestingFee;
     }
 
@@ -236,7 +223,6 @@ contract Unirep is SnarkConstants, Hasher {
         require(hasUserSignedUp[_identityCommitment] == false, "Unirep: the user has already signed up");
         require(numUserSignUps < maxUsers, "Unirep: maximum number of user signups reached");
         
-        // uint256 defaultUserStateRoot = emptyUserStateRoot;
         uint256 attesterId = attesters[msg.sender];
         uint256 airdropPosRep = airdropAmount[msg.sender];
 
@@ -250,8 +236,6 @@ contract Unirep is SnarkConstants, Hasher {
             attesterId, 
             airdropPosRep
         );
-
-        proofIndex ++;
     }
 
     /*
@@ -849,45 +833,6 @@ contract Unirep is SnarkConstants, Hasher {
             [_proof[6], _proof[7]]
         );
     }
-
-//     function hashedBlankStateLeaf() public view returns (uint256) {
-//         StateLeaf memory stateLeaf = StateLeaf({
-//             identityCommitment: 0,
-//             userStateRoot: emptyUserStateRoot
-//         });
-
-//         return hashStateLeaf(stateLeaf);
-//     }
-
-//     function calcAirdropUSTRoot(uint256 _leafIndex, uint256 _leafValue) public view returns (uint256) {
-//         uint256[5] memory defaultStateLeafValues;
-//         for (uint8 i = 0; i < 5; i++) {
-//             defaultStateLeafValues[i] = 0;
-//         }
-//         uint256 defaultUserStateLeaf = hash5(defaultStateLeafValues);
-//         return computeOneNonZeroLeafRoot(treeDepths.userStateTreeDepth, _leafIndex, _leafValue, defaultUserStateLeaf);
-//     }
-
-//     function calcEmptyUserStateTreeRoot(uint8 _levels) internal pure returns (uint256) {
-//         uint256[5] memory defaultStateLeafValues;
-//         for (uint8 i = 0; i < 5; i++) {
-//             defaultStateLeafValues[i] = 0;
-//         }
-//         uint256 defaultUserStateLeaf = hash5(defaultStateLeafValues);
-//         return computeEmptyRoot(_levels, defaultUserStateLeaf);
-//     }
-
-//     function calcEmptyGlobalStateTreeRoot(uint8 _levels) internal view returns (uint256) {
-//         // Compute the hash of a blank state leaf
-//         StateLeaf memory stateLeaf = StateLeaf({
-//             identityCommitment: 0,
-//             userStateRoot: emptyUserStateRoot
-//         });
-
-//         uint256 h = hashStateLeaf(stateLeaf);
-
-//         return computeEmptyRoot(_levels, h);
-//     }
 
     /*
      * Functions to burn fee and collect compenstation.
