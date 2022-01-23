@@ -289,10 +289,10 @@ class UserTransitionProof implements IUserTransitionProof{
 }
 
 const computeStartTransitionProofHash = (
-    blindedUserState: BigInt,
-    blindedHashChain: BigInt,
-    globalStateTree: BigInt,
-    proof: BigInt[]
+    blindedUserState: Field,
+    blindedHashChain: Field,
+    globalStateTree: Field,
+    proof: Field[]
 ) => {
     const iface = new ethers.utils.Interface(Unirep.abi)
     const abiEncoder = iface.encodeFunctionData(
@@ -308,10 +308,10 @@ const computeStartTransitionProofHash = (
 }
 
 const computeProcessAttestationsProofHash = (
-    outputBlindedUserState: BigInt,
-    outputBlindedHashChain: BigInt,
-    inputBlindedUserState: BigInt,
-    proof: BigInt[]
+    outputBlindedUserState: Field,
+    outputBlindedHashChain: Field,
+    inputBlindedUserState: Field,
+    proof: Field[]
 ) => {
     const iface = new ethers.utils.Interface(Unirep.abi)
     const abiEncoder = iface.encodeFunctionData(

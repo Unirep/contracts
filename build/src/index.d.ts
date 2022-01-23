@@ -118,8 +118,8 @@ declare class UserTransitionProof implements IUserTransitionProof {
     verify: () => Promise<boolean>;
     hash: () => string;
 }
-declare const computeStartTransitionProofHash: (blindedUserState: BigInt, blindedHashChain: BigInt, globalStateTree: BigInt, proof: BigInt[]) => string;
-declare const computeProcessAttestationsProofHash: (outputBlindedUserState: BigInt, outputBlindedHashChain: BigInt, inputBlindedUserState: BigInt, proof: BigInt[]) => string;
+declare const computeStartTransitionProofHash: (blindedUserState: Field, blindedHashChain: Field, globalStateTree: Field, proof: Field[]) => string;
+declare const computeProcessAttestationsProofHash: (outputBlindedUserState: Field, outputBlindedHashChain: Field, inputBlindedUserState: Field, proof: Field[]) => string;
 declare const deployUnirep: (deployer: ethers.Signer, _treeDepths: any, _settings?: any) => Promise<ethers.Contract>;
 declare const getUnirepContract: (addressOrName: string, signerOrProvider: ethers.Signer | ethers.providers.Provider | undefined) => ethers.Contract;
 export { Event, AttestationEvent, IAttestation, IEpochKeyProof, IReputationProof, ISignUpProof, IUserTransitionProof, Attestation, EpochKeyProof, ReputationProof, SignUpProof, UserTransitionProof, computeStartTransitionProofHash, computeProcessAttestationsProofHash, deployUnirep, getUnirepContract, Unirep };
