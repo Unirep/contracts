@@ -5,8 +5,9 @@ import assert from 'assert'
 import { ethers } from 'ethers'
 import Keyv from "keyv"
 import { hash5, hashLeftRight, SparseMerkleTreeImpl, add0x, SnarkBigInt, hashOne, stringifyBigInts, Identity, SnarkProof, genIdentityCommitment, genRandomSalt, IncrementalQuinTree } from '@unirep/crypto'
-import { Circuit, formatProofForSnarkjsVerification, formatProofForVerifierContract, genProofAndPublicSignals, verifyProof } from '@unirep/circuits'
+import { Circuit, formatProofForVerifierContract, genProofAndPublicSignals, verifyProof } from '@unirep/circuits'
 import { circuitEpochTreeDepth, circuitUserStateTreeDepth, circuitGlobalStateTreeDepth, numAttestationsPerProof, maxReputationBudget, numEpochKeyNoncePerEpoch } from '../config'
+import { Attestation, EpochKeyProof, ReputationProof, SignUpProof, UserTransitionProof } from '../src'
 
 const SMT_ZERO_LEAF = hashLeftRight(BigInt(0), BigInt(0))
 const SMT_ONE_LEAF = hashLeftRight(BigInt(1), BigInt(0))
@@ -14,222 +15,6 @@ const EPOCH_KEY_NULLIFIER_DOMAIN = BigInt(1)
 const GSTZERO_VALUE = 0
 
 export type Field = BigInt | string | number | ethers.BigNumber
-
-// the struct EpochKeyProof in UnirepObjs
-export class EpochKeyProof {
-    public globalStateTree: Field
-    public epoch: Field
-    public epochKey: Field
-    public proof: Field[]
-    private publicSignals: Field[]
-
-    constructor(
-        _publicSignals: Field[],
-        _proof: SnarkProof
-    ) {
-        const formattedProof: any[] = formatProofForVerifierContract(_proof)
-        this.globalStateTree = _publicSignals[0]
-        this.epoch = _publicSignals[1]
-        this.epochKey = _publicSignals[2]
-        this.proof = formattedProof
-        this.publicSignals = _publicSignals
-    }
-
-    public verify = (): Promise<boolean> => {
-        const proof_ = formatProofForSnarkjsVerification(this.proof.map(n => n.toString()))
-        return verifyProof(Circuit.verifyEpochKey, proof_, this.publicSignals.map(n => BigInt(n.toString())))
-    }
-}
-
-interface IReputationProof {
-    repNullifiers: Field[],
-    epoch: Field;
-    epochKey: Field;
-    globalStateTree: Field;
-    attesterId: Field;
-    proveReputationAmount: Field;
-    minRep: Field;
-    proveGraffiti: Field;
-    graffitiPreImage: Field;
-    proof: Field[];
-}
-
-// the struct ReputationProof in UnirepObjs
-export class ReputationProof implements IReputationProof {
-    public repNullifiers: Field[]
-    public epoch: Field
-    public epochKey: Field
-    public globalStateTree: Field
-    public attesterId: Field
-    public proveReputationAmount: Field
-    public minRep: Field
-    public proveGraffiti: Field
-    public graffitiPreImage: Field
-    public proof: Field[]
-    private publicSignals: Field[]
-
-    constructor(
-        _publicSignals: Field[],
-        _proof: SnarkProof
-    ) {
-        const formattedProof: any[] = formatProofForVerifierContract(_proof)
-        this.repNullifiers = _publicSignals.slice(0, maxReputationBudget)
-        this.epoch = _publicSignals[maxReputationBudget]
-        this.epochKey = _publicSignals[maxReputationBudget + 1]
-        this.globalStateTree = _publicSignals[maxReputationBudget + 2]
-        this.attesterId = _publicSignals[maxReputationBudget + 3]
-        this.proveReputationAmount = _publicSignals[maxReputationBudget + 4]
-        this.minRep = _publicSignals[maxReputationBudget + 5]
-        this.proveGraffiti = _publicSignals[maxReputationBudget + 6]
-        this.graffitiPreImage = _publicSignals[maxReputationBudget + 7]
-        this.proof = formattedProof
-        this.publicSignals = _publicSignals
-    }
-
-    public verify = (): Promise<boolean> => {
-        const proof_ = formatProofForSnarkjsVerification(this.proof.map(n => n.toString()))
-        return verifyProof(Circuit.proveReputation, proof_, this.publicSignals.map(n => BigInt(n.toString())))
-    }
-}
-
-interface ISignUpProof {
-    epoch: Field;
-    epochKey: Field;
-    globalStateTree: Field;
-    attesterId: Field;
-    userHasSignedUp: Field;
-    proof: Field[];
-}
-
-// the struct SignUpProof in UnirepObjs
-export class SignUpProof implements ISignUpProof{
-    public epoch: Field
-    public epochKey: Field
-    public globalStateTree: Field
-    public attesterId: Field
-    public userHasSignedUp: Field
-    public proof: Field[]
-    private publicSignals: Field[]
-
-    constructor(
-        _publicSignals: Field[],
-        _proof: SnarkProof
-    ) {
-        const formattedProof: any[] = formatProofForVerifierContract(_proof)
-        this.epoch = _publicSignals[0]
-        this.epochKey = _publicSignals[1]
-        this.globalStateTree = _publicSignals[2]
-        this.attesterId = _publicSignals[3]
-        this.userHasSignedUp = _publicSignals[4]
-        this.proof = formattedProof
-        this.publicSignals = _publicSignals
-    }
-
-    public verify = (): Promise<boolean> => {
-        const proof_ = formatProofForSnarkjsVerification(this.proof.map(n => n.toString()))
-        return verifyProof(Circuit.proveUserSignUp, proof_, this.publicSignals.map(n => BigInt(n.toString())))
-    }
-}
-
-interface IUserTransitionProof {
-    newGlobalStateTreeLeaf: Field;
-    epkNullifiers: Field[];
-    transitionFromEpoch: Field;
-    blindedUserStates: Field[];
-    fromGlobalStateTree: Field;
-    blindedHashChains: Field[];
-    fromEpochTree: Field;
-    proof: Field[];
-}
-
-// the struct SignUpProof in UnirepObjs
-export class UserTransitionProof implements IUserTransitionProof{
-    public newGlobalStateTreeLeaf: Field
-    public epkNullifiers: Field[]
-    public transitionFromEpoch: Field
-    public blindedUserStates: Field[]
-    public fromGlobalStateTree: Field
-    public blindedHashChains: Field[]
-    public fromEpochTree: Field
-    public proof: Field[]
-    private publicSignals: Field[]
-
-    constructor(
-        _publicSignals: Field[],
-        _proof: SnarkProof
-    ) {
-        const formattedProof: any[] = formatProofForVerifierContract(_proof)
-        this.newGlobalStateTreeLeaf = _publicSignals[0]
-        this.epkNullifiers = []
-        this.blindedUserStates = []
-        this.blindedHashChains = []
-        for (let i = 0; i < numEpochKeyNoncePerEpoch; i++) {
-            this.epkNullifiers.push(_publicSignals[1+i])
-        }
-        this.transitionFromEpoch = _publicSignals[1 + numEpochKeyNoncePerEpoch]
-        this.blindedUserStates.push(_publicSignals[2 + numEpochKeyNoncePerEpoch])
-        this.blindedUserStates.push(_publicSignals[3 + numEpochKeyNoncePerEpoch])
-        this.fromGlobalStateTree = _publicSignals[4 + numEpochKeyNoncePerEpoch]
-        for (let i = 0; i < numEpochKeyNoncePerEpoch; i++) {
-            this.blindedHashChains.push(_publicSignals[5 + numEpochKeyNoncePerEpoch + i])
-        }
-        this.fromEpochTree = _publicSignals[5 + numEpochKeyNoncePerEpoch* 2]
-        this.proof = formattedProof
-        this.publicSignals = _publicSignals
-    }
-
-    public verify = (): Promise<boolean> => {
-        const proof_ = formatProofForSnarkjsVerification(this.proof.map(n => n.toString()))
-        return verifyProof(Circuit.userStateTransition, proof_, this.publicSignals.map(n => BigInt(n.toString())))
-    }
-}
-
-
-interface IEpochTreeLeaf {
-    epochKey: BigInt;
-    hashchainResult: BigInt;
-}
-
-interface IAttestation {
-    attesterId: BigInt;
-    posRep: BigInt;
-    negRep: BigInt;
-    graffiti: BigInt;
-    signUp: BigInt;
-    hash(): BigInt;
-}
-
-class Attestation implements IAttestation {
-    public attesterId: BigInt
-    public posRep: BigInt
-    public negRep: BigInt
-    public graffiti: BigInt
-    public signUp: BigInt
-
-    constructor(
-        _attesterId: BigInt,
-        _posRep: BigInt,
-        _negRep: BigInt,
-        _graffiti: BigInt,
-        _signUp: BigInt,
-    ) {
-        this.attesterId = _attesterId
-        this.posRep = _posRep
-        this.negRep = _negRep
-        this.graffiti = _graffiti
-        this.signUp = _signUp
-    }
-
-    public hash = (): BigInt => {
-        return hash5([
-            this.attesterId,
-            this.posRep,
-            this.negRep,
-            this.graffiti,
-            this.signUp,
-        ])
-    }
-}
 
 interface IReputation {
     posRep: BigInt;
@@ -355,14 +140,6 @@ const genEpochKey = (identityNullifier: SnarkBigInt, epoch: number, nonce: numbe
 
 const genEpochKeyNullifier = (identityNullifier: SnarkBigInt, epoch: number, nonce: number): SnarkBigInt => {
     return hash5([EPOCH_KEY_NULLIFIER_DOMAIN, identityNullifier, BigInt(epoch), BigInt(nonce), BigInt(0)])
-}
-
-const computeEpochKeyProofHash = (epochKeyProof: any) => {
-    const abiEncoder = ethers.utils.defaultAbiCoder.encode(
-        ["tuple(uint256 globalStateTree,uint256 epoch,uint256 epochKey,uint256[8] proof)"], 
-        [ epochKeyProof ]
-    )
-    return ethers.utils.keccak256(abiEncoder)
 }
 
 const bootstrapRandomUSTree = async (): Promise<any> => {
@@ -799,7 +576,6 @@ const genInputForContract = async (circuit: Circuit, circuitInputs) => {
 
 
 export {
-    IEpochTreeLeaf,
     Attestation,
     Reputation,
     SMT_ONE_LEAF,
@@ -815,7 +591,6 @@ export {
     toCompleteHexString,
     genEpochKey,
     genEpochKeyNullifier,
-    computeEpochKeyProofHash,
     bootstrapRandomUSTree,
     genEpochKeyCircuitInput,
     genStartTransitionCircuitInput,

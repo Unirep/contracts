@@ -6,8 +6,8 @@ import { Circuit } from '@unirep/circuits'
 import { genRandomSalt, genIdentity, genIdentityCommitment, hashLeftRight, IncrementalQuinTree } from '@unirep/crypto'
 
 import { attestingFee, circuitGlobalStateTreeDepth, epochLength, maxAttesters, maxReputationBudget, maxUsers, numEpochKeyNoncePerEpoch } from '../config'
-import { getTreeDepthsForTesting, Attestation, computeEpochKeyProofHash, genEpochKeyCircuitInput, genInputForContract, GSTZERO_VALUE, genReputationCircuitInput, bootstrapRandomUSTree, ReputationProof, genProveSignUpCircuitInput, SignUpProof, genStartTransitionCircuitInput, genProcessAttestationsCircuitInput, genUserStateTransitionCircuitInput, UserTransitionProof } from './utils'
-import { deployUnirep } from '../src'
+import { getTreeDepthsForTesting, Attestation, genEpochKeyCircuitInput, genInputForContract, GSTZERO_VALUE, genReputationCircuitInput, bootstrapRandomUSTree, genProveSignUpCircuitInput, genStartTransitionCircuitInput, genProcessAttestationsCircuitInput, genUserStateTransitionCircuitInput } from './utils'
+import { computeProcessAttestationsProofHash, computeStartTransitionProofHash, deployUnirep, ReputationProof, SignUpProof, UserTransitionProof } from '../src'
 
 describe('Attesting', () => {
     let unirepContract
@@ -74,9 +74,8 @@ describe('Attesting', () => {
         expect(receipt.status).equal(1)
 
         const proofNullifier = await unirepContract.hashEpochKeyProof(input)
-        const _proofNullifier = computeEpochKeyProofHash(input)
-        expect(_proofNullifier).equal(proofNullifier)
-        proofIndex = await unirepContract.getProofIndex(proofNullifier)
+        expect(input.hash()).equal(proofNullifier.toString())
+        proofIndex = await unirepContract.getProofIndex(input.hash())
         expect(Number(proofIndex)).greaterThan(0)
     })
 
@@ -111,8 +110,8 @@ describe('Attesting', () => {
         expect(receipt.status).equal(1)
 
         const proofNullifier = await unirepContract.hashReputationProof(input)
-        expect(receipt.status).equal(1)
-        proofIndex = await unirepContract.getProofIndex(proofNullifier)
+        expect(input.hash()).equal(proofNullifier.toString())
+        proofIndex = await unirepContract.getProofIndex(input.hash())
         expect(Number(proofIndex)).greaterThan(0)
     })
 
@@ -127,8 +126,8 @@ describe('Attesting', () => {
         expect(receipt.status).equal(1)
 
         const proofNullifier = await unirepContract.hashSignUpProof(input)
-        expect(receipt.status).equal(1)
-        proofIndex = await unirepContract.getProofIndex(proofNullifier)
+        expect(input.hash()).equal(proofNullifier.toString())
+        proofIndex = await unirepContract.getProofIndex(input.hash())
         expect(Number(proofIndex)).greaterThan(0)
     })
 
@@ -145,8 +144,9 @@ describe('Attesting', () => {
         expect(receipt.status).equal(1)
 
         const proofNullifier = await unirepContract.hashStartTransitionProof(blindedUserState, blindedHashChain, GSTRoot, proof,)
-        expect(receipt.status).equal(1)
-        proofIndex = await unirepContract.getProofIndex(proofNullifier)
+        const computedHash = computeStartTransitionProofHash(blindedUserState, blindedHashChain, GSTRoot, proof)
+        expect(computedHash).equal(proofNullifier.toString())
+        proofIndex = await unirepContract.getProofIndex(computedHash)
         expect(Number(proofIndex)).greaterThan(0)
     })
 
@@ -162,9 +162,10 @@ describe('Attesting', () => {
         const receipt = await tx.wait()
         expect(receipt.status).equal(1)
 
-        const proofNullifier = await unirepContract.hashProcessAttestationsProof(outputBlindedUserState, outputBlindedHashChain, inputBlindedUserState, proof,)
-        expect(receipt.status).equal(1)
-        proofIndex = await unirepContract.getProofIndex(proofNullifier)
+        const proofNullifier = await unirepContract.hashProcessAttestationsProof(outputBlindedUserState, outputBlindedHashChain, inputBlindedUserState, proof)
+        const computedHash = computeProcessAttestationsProofHash(outputBlindedUserState, outputBlindedHashChain, inputBlindedUserState, proof)
+        expect(computedHash).equal(proofNullifier.toString())
+        proofIndex = await unirepContract.getProofIndex(computedHash)
         expect(Number(proofIndex)).greaterThan(0)
     })
 
@@ -183,8 +184,8 @@ describe('Attesting', () => {
         expect(receipt.status).equal(1)
 
         const proofNullifier = await unirepContract.hashUserStateTransitionProof(input)
-        expect(receipt.status).equal(1)
-        proofIndex = await unirepContract.getProofIndex(proofNullifier)
+        expect(input.hash()).equal(proofNullifier.toString())
+        proofIndex = await unirepContract.getProofIndex(input.hash())
         expect(Number(proofIndex)).greaterThan(0)
     })
 

@@ -1,6 +1,7 @@
 import { ethers } from 'ethers'
+import { add0x, hash5, SnarkProof } from '@unirep/crypto'
 import { Circuit, formatProofForSnarkjsVerification, formatProofForVerifierContract, verifyProof } from '@unirep/circuits'
-import { maxUsers, maxAttesters, numEpochKeyNoncePerEpoch, epochLength, attestingFee, maxReputationBudget } from '../config'
+import { maxUsers, maxAttesters, numEpochKeyNoncePerEpoch, epochLength, attestingFee, maxReputationBudget, globalStateTreeDepth } from '../config'
 
 import Unirep from "../artifacts/contracts/Unirep.sol/Unirep.json"
 import EpochKeyValidityVerifier from "../artifacts/contracts/EpochKeyValidityVerifier.sol/EpochKeyValidityVerifier.json"
@@ -9,7 +10,6 @@ import UserSignUpVerifier from "../artifacts/contracts/UserSignUpVerifier.sol/Us
 import StartTransitionVerifier from "../artifacts/contracts/StartTransitionVerifier.sol/StartTransitionVerifier.json"
 import UserStateTransitionVerifier from "../artifacts/contracts/UserStateTransitionVerifier.sol/UserStateTransitionVerifier.json"
 import ProcessAttestationsVerifier from "../artifacts/contracts/ProcessAttestationsVerifier.sol/ProcessAttestationsVerifier.json"
-import { hash5, SnarkProof } from '@unirep/crypto'
 
 export type Field = BigInt | string | number | ethers.BigNumber
 
@@ -131,10 +131,16 @@ class EpochKeyProof implements IEpochKeyProof {
         const proof_ = formatProofForSnarkjsVerification(this.proof.map(n => n.toString()))
         return verifyProof(Circuit.verifyEpochKey, proof_, this.publicSignals.map(n => BigInt(n.toString())))
     }
+
+    public hash = () => {
+        const iface = new ethers.utils.Interface(Unirep.abi)
+        const abiEncoder = iface.encodeFunctionData('hashEpochKeyProof', [this])
+        return ethers.utils.keccak256(rmFuncSigHash(abiEncoder))
+    }
 }
 
 class ReputationProof implements IReputationProof {
-  public repNullifiers: Field[]
+    public repNullifiers: Field[]
     public epoch: Field
     public epochKey: Field
     public globalStateTree: Field
@@ -168,6 +174,25 @@ class ReputationProof implements IReputationProof {
         const proof_ = formatProofForSnarkjsVerification(this.proof.map(n => n.toString()))
         return verifyProof(Circuit.proveReputation, proof_, this.publicSignals.map(n => BigInt(n.toString())))
     }
+
+    public hash = () => {
+        // array length should be fixed
+        const abiEncoder = ethers.utils.defaultAbiCoder.encode(
+            [`tuple(uint256[${maxReputationBudget}] repNullifiers,
+                    uint256 epoch,
+                    uint256 epochKey, 
+                    uint256 globalStateTree,
+                    uint256 attesterId,
+                    uint256 proveReputationAmount,
+                    uint256 minRep,
+                    uint256 proveGraffiti,
+                    uint256 graffitiPreImage,
+                    uint256[8] proof)
+            `], 
+            [ this ]
+        )
+        return ethers.utils.keccak256(abiEncoder)
+    }
 }
 
 class SignUpProof implements ISignUpProof {
@@ -196,6 +221,12 @@ class SignUpProof implements ISignUpProof {
     public verify = (): Promise<boolean> => {
         const proof_ = formatProofForSnarkjsVerification(this.proof.map(n => n.toString()))
         return verifyProof(Circuit.proveUserSignUp, proof_, this.publicSignals.map(n => BigInt(n.toString())))
+    }
+
+    public hash = () => {
+        const iface = new ethers.utils.Interface(Unirep.abi)
+        const abiEncoder = iface.encodeFunctionData('hashSignUpProof', [this])
+        return ethers.utils.keccak256(rmFuncSigHash(abiEncoder))
     }
 }
 
@@ -238,6 +269,65 @@ class UserTransitionProof implements IUserTransitionProof{
         const proof_ = formatProofForSnarkjsVerification(this.proof.map(n => n.toString()))
         return verifyProof(Circuit.userStateTransition, proof_, this.publicSignals.map(n => BigInt(n.toString())))
     }
+
+    public hash = () => {
+        // array length should be fixed
+        const abiEncoder = ethers.utils.defaultAbiCoder.encode(
+            [`tuple(uint256 newGlobalStateTreeLeaf,
+                    uint256[${numEpochKeyNoncePerEpoch}] epkNullifiers,
+                    uint256 transitionFromEpoch,
+                    uint256[2] blindedUserStates,
+                    uint256 fromGlobalStateTree,
+                    uint256[${numEpochKeyNoncePerEpoch}] blindedHashChains,
+                    uint256 fromEpochTree,
+                    uint256[8] proof)
+            `], 
+            [ this ]
+        )
+        return ethers.utils.keccak256(abiEncoder)
+    }
+}
+
+const computeStartTransitionProofHash = (
+    blindedUserState: BigInt,
+    blindedHashChain: BigInt,
+    globalStateTree: BigInt,
+    proof: BigInt[]
+) => {
+    const iface = new ethers.utils.Interface(Unirep.abi)
+    const abiEncoder = iface.encodeFunctionData(
+        'hashStartTransitionProof',
+        [ 
+            blindedUserState,
+            blindedHashChain,
+            globalStateTree,
+            proof
+        ]
+    )
+    return ethers.utils.keccak256(rmFuncSigHash(abiEncoder))
+}
+
+const computeProcessAttestationsProofHash = (
+    outputBlindedUserState: BigInt,
+    outputBlindedHashChain: BigInt,
+    inputBlindedUserState: BigInt,
+    proof: BigInt[]
+) => {
+    const iface = new ethers.utils.Interface(Unirep.abi)
+    const abiEncoder = iface.encodeFunctionData(
+        'hashProcessAttestationsProof',
+        [ 
+            outputBlindedUserState,
+            outputBlindedHashChain,
+            inputBlindedUserState,
+            proof
+        ]
+    )
+    return ethers.utils.keccak256(rmFuncSigHash(abiEncoder))
+}
+
+const rmFuncSigHash = (abiEncoder: string) => {
+    return add0x(abiEncoder.slice(10,))
 }
 
 const deployUnirep = async (
@@ -347,6 +437,8 @@ export {
     ReputationProof,
     SignUpProof,
     UserTransitionProof,
+    computeStartTransitionProofHash,
+    computeProcessAttestationsProofHash,
     deployUnirep,
     getUnirepContract,
     Unirep

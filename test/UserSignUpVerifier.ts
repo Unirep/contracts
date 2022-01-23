@@ -5,8 +5,8 @@ import { expect } from "chai"
 import { Circuit } from "@unirep/circuits"
 import { genRandomSalt, genIdentity, hashOne, } from "@unirep/crypto"
 import { circuitEpochTreeDepth, } from "../config"
-import { genEpochKey, genInputForContract, genProveSignUpCircuitInput, getTreeDepthsForTesting, Reputation, SignUpProof } from './utils'
-import { deployUnirep } from '../src'
+import { genEpochKey, genInputForContract, genProveSignUpCircuitInput, getTreeDepthsForTesting, Reputation } from './utils'
+import { deployUnirep, SignUpProof } from '../src'
 
 
 describe('Verify user sign up verifier', function () {

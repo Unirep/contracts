@@ -5,8 +5,8 @@ import { expect } from "chai"
 import { Circuit } from "@unirep/circuits"
 import { genRandomSalt, hashLeftRight, genIdentity, genIdentityCommitment, IncrementalQuinTree, } from "@unirep/crypto"
 import { numEpochKeyNoncePerEpoch, circuitEpochTreeDepth, circuitGlobalStateTreeDepth } from "../config"
-import { EpochKeyProof, genEpochKeyCircuitInput, genInputForContract, getTreeDepthsForTesting } from './utils'
-import { deployUnirep } from '../src'
+import { genEpochKeyCircuitInput, genInputForContract, getTreeDepthsForTesting } from './utils'
+import { EpochKeyProof, deployUnirep } from '../src'
 
 
 describe('Verify Epoch Key verifier', function () {
@@ -49,11 +49,14 @@ describe('Verify Epoch Key verifier', function () {
             input = await genInputForContract(Circuit.verifyEpochKey, circuitInputs)
             const isValid = await input.verify()
             expect(isValid, 'Verify epoch key proof off-chain failed').to.be.true
-            const tx = await unirepContract.submitEpochKeyProof(input)
+            let tx = await unirepContract.submitEpochKeyProof(input)
             const receipt = await tx.wait()
             expect(receipt.status).equal(1)
             const isProofValid = await unirepContract.verifyEpochKeyValidity(input)
             expect(isProofValid, 'Verify epk proof on-chain failed').to.be.true
+
+            const pfIdx = await unirepContract.getProofIndex(input.hash())
+            expect(Number(pfIdx)).not.eq(0)
         }
     })
 

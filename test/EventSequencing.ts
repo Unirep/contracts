@@ -3,9 +3,10 @@ import { ethers as hardhatEthers } from 'hardhat'
 import { ethers } from 'ethers'
 import { expect } from "chai"
 import { genRandomSalt, genIdentity, genIdentityCommitment } from '@unirep/crypto'
+import { formatProofForSnarkjsVerification } from '@unirep/circuits'
 import { attestingFee, epochLength, maxReputationBudget, numEpochKeyNoncePerEpoch } from '../config'
-import { genEpochKey, getTreeDepthsForTesting, Attestation, computeEpochKeyProofHash } from './utils'
-import { deployUnirep, Event, Unirep } from '../src'
+import { genEpochKey, getTreeDepthsForTesting, Attestation } from './utils'
+import { deployUnirep, EpochKeyProof, Event, Unirep } from '../src'
 
 describe('EventSequencing', () => {
     let expectedEventsInOrder: Event[] = []
@@ -49,16 +50,19 @@ describe('EventSequencing', () => {
         let currentEpoch = await unirepContract.currentEpoch()
         let epochKeyNonce = 0
         let epochKey = genEpochKey(userIds[0].identityNullifier, currentEpoch.toNumber(), epochKeyNonce)
-        const proof: BigInt[] = []
+        const proof: string[] = []
         for (let i = 0; i < 8; i++) {
-            proof.push(BigInt(0))
+            proof.push('0')
         }
-        let epochKeyProof = [genRandomSalt(), currentEpoch, epochKey, proof]
+        let publicSignals = [genRandomSalt(), currentEpoch, epochKey]
+        let epochKeyProof = new EpochKeyProof(
+            publicSignals, 
+            formatProofForSnarkjsVerification(proof)
+        )
         tx = await unirepContract.submitEpochKeyProof(epochKeyProof)
         receipt = await tx.wait()
         expect(receipt.status).equal(1)
-        const proofNullifier = computeEpochKeyProofHash(epochKeyProof)
-        const epochKeyProofIndex = await unirepContract.getProofIndex(proofNullifier)
+        const epochKeyProofIndex = await unirepContract.getProofIndex(epochKeyProof.hash())
         expect(epochKeyProof).not.equal(null)
 
         // 2. Submit reputation nullifiers
@@ -186,7 +190,11 @@ describe('EventSequencing', () => {
             genRandomSalt(),
             BigInt(signedUpInLeaf),
         )
-        epochKeyProof = [genRandomSalt(), currentEpoch, epochKey, proof]
+        publicSignals = [genRandomSalt(), currentEpoch, epochKey]
+        epochKeyProof = new EpochKeyProof(
+            publicSignals,
+            formatProofForSnarkjsVerification(proof)
+        )
         tx = await unirepContractCalledByAttester.submitAttestation(
             attestation,
             epochKey,
@@ -265,7 +273,6 @@ describe('EventSequencing', () => {
         expect(receipt.status).equal(1)
 
         // 16. Second user processes attestations
-        epochKeyProof = [genRandomSalt(), currentEpoch, epochKey, proof]
         tx = await unirepContract.processAttestations(
             genRandomSalt(),
             genRandomSalt(),

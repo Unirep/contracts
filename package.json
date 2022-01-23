@@ -27,6 +27,7 @@
     "circom": "^0.5.45",
     "ethereum-waffle": "^3.4.0",
     "hardhat": "^2.6.4",
-    "ts-node": "^10.2.1"
+    "ts-node": "^10.2.1",
+    "keyv": "^4.0.3"
   }
 }

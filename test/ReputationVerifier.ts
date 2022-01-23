@@ -5,8 +5,8 @@ import { expect } from "chai"
 import { Circuit } from "@unirep/circuits"
 import { genRandomSalt, genIdentity, hashOne, } from "@unirep/crypto"
 import { circuitEpochTreeDepth, maxReputationBudget, circuitUserStateTreeDepth, attestingFee } from "../config"
-import { genEpochKey, genInputForContract, genReputationCircuitInput, getTreeDepthsForTesting, Reputation, ReputationProof } from './utils'
-import { deployUnirep, Unirep } from '../src'
+import { genEpochKey, genInputForContract, genReputationCircuitInput, getTreeDepthsForTesting, Reputation } from './utils'
+import { deployUnirep, Unirep, ReputationProof } from '../src'
 
 describe('Verify reputation verifier', function () {
     this.timeout(30000)
@@ -157,6 +157,9 @@ describe('Verify reputation verifier', function () {
         )
         const receipt = await tx.wait()
         expect(receipt.status).equal(1)
+
+        const pfIdx = await unirepContract.getProofIndex(input.hash())
+        expect(Number(pfIdx)).not.eq(0)
     })
 
     it('submit reputation nullifiers with wrong length of nullifiers should fail', async () => {

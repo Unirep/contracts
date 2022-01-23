@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
-import Unirep from "../artifacts/contracts/Unirep.sol/Unirep.json";
 import { SnarkProof } from '@unirep/crypto';
+import Unirep from "../artifacts/contracts/Unirep.sol/Unirep.json";
 export declare type Field = BigInt | string | number | ethers.BigNumber;
 declare enum Event {
     UserSignedUp = 0,
@@ -74,6 +74,7 @@ declare class EpochKeyProof implements IEpochKeyProof {
     private publicSignals;
     constructor(_publicSignals: Field[], _proof: SnarkProof);
     verify: () => Promise<boolean>;
+    hash: () => string;
 }
 declare class ReputationProof implements IReputationProof {
     repNullifiers: Field[];
@@ -89,6 +90,7 @@ declare class ReputationProof implements IReputationProof {
     private publicSignals;
     constructor(_publicSignals: Field[], _proof: SnarkProof);
     verify: () => Promise<boolean>;
+    hash: () => string;
 }
 declare class SignUpProof implements ISignUpProof {
     epoch: Field;
@@ -100,6 +102,7 @@ declare class SignUpProof implements ISignUpProof {
     private publicSignals;
     constructor(_publicSignals: Field[], _proof: SnarkProof);
     verify: () => Promise<boolean>;
+    hash: () => string;
 }
 declare class UserTransitionProof implements IUserTransitionProof {
     newGlobalStateTreeLeaf: Field;
@@ -113,7 +116,10 @@ declare class UserTransitionProof implements IUserTransitionProof {
     private publicSignals;
     constructor(_publicSignals: Field[], _proof: SnarkProof);
     verify: () => Promise<boolean>;
+    hash: () => string;
 }
+declare const computeStartTransitionProofHash: (blindedUserState: BigInt, blindedHashChain: BigInt, globalStateTree: BigInt, proof: BigInt[]) => string;
+declare const computeProcessAttestationsProofHash: (outputBlindedUserState: BigInt, outputBlindedHashChain: BigInt, inputBlindedUserState: BigInt, proof: BigInt[]) => string;
 declare const deployUnirep: (deployer: ethers.Signer, _treeDepths: any, _settings?: any) => Promise<ethers.Contract>;
 declare const getUnirepContract: (addressOrName: string, signerOrProvider: ethers.Signer | ethers.providers.Provider | undefined) => ethers.Contract;
-export { Event, AttestationEvent, IAttestation, IEpochKeyProof, IReputationProof, ISignUpProof, IUserTransitionProof, Attestation, EpochKeyProof, ReputationProof, SignUpProof, UserTransitionProof, deployUnirep, getUnirepContract, Unirep };
+export { Event, AttestationEvent, IAttestation, IEpochKeyProof, IReputationProof, ISignUpProof, IUserTransitionProof, Attestation, EpochKeyProof, ReputationProof, SignUpProof, UserTransitionProof, computeStartTransitionProofHash, computeProcessAttestationsProofHash, deployUnirep, getUnirepContract, Unirep };

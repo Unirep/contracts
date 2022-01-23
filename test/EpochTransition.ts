@@ -6,8 +6,8 @@ import { genRandomSalt, hashLeftRight, IncrementalQuinTree, genIdentity, genIden
 import { Circuit } from '@unirep/circuits'
 
 import { circuitGlobalStateTreeDepth, epochLength, maxAttesters, maxReputationBudget, maxUsers, numEpochKeyNoncePerEpoch } from '../config'
-import { getTreeDepthsForTesting, Attestation, genEpochKeyCircuitInput, genInputForContract, genStartTransitionCircuitInput, bootstrapRandomUSTree, GSTZERO_VALUE, genProcessAttestationsCircuitInput, genUserStateTransitionCircuitInput, UserTransitionProof } from './utils'
-import { deployUnirep, Unirep } from '../src'
+import { getTreeDepthsForTesting, Attestation, genEpochKeyCircuitInput, genInputForContract, genStartTransitionCircuitInput, bootstrapRandomUSTree, GSTZERO_VALUE, genProcessAttestationsCircuitInput, genUserStateTransitionCircuitInput } from './utils'
+import { deployUnirep, Unirep, UserTransitionProof } from '../src'
 
 describe('Epoch Transition', function () {
     this.timeout(1000000)

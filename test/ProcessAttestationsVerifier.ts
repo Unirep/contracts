@@ -5,8 +5,8 @@ import { expect } from "chai"
 import { genIdentity } from "@unirep/crypto"
 import { Circuit } from "@unirep/circuits"
 import { genInputForContract,genProcessAttestationsCircuitInput, getTreeDepthsForTesting } from './utils'
-import { numAttestationsPerProof } from "../config/"
-import { deployUnirep } from '../src'
+import { numAttestationsPerProof } from "../config"
+import { computeProcessAttestationsProofHash, deployUnirep } from '../src'
 
 describe('Process attestation circuit', function () {
     this.timeout(300000)
@@ -31,6 +31,25 @@ describe('Process attestation circuit', function () {
         const { outputBlindedUserState, outputBlindedHashChain, inputBlindedUserState, proof } = await genInputForContract(Circuit.processAttestations, circuitInputs)
         const isProofValid = await unirepContract.verifyProcessAttestationProof( outputBlindedUserState, outputBlindedHashChain, inputBlindedUserState, proof)
         expect(isProofValid).to.be.true
+
+        const tx = await unirepContract.processAttestations(
+            outputBlindedUserState, 
+            outputBlindedHashChain, 
+            inputBlindedUserState, 
+            proof
+        )
+        const receipt = await tx.wait()
+        expect(receipt.status).equal(1)
+
+        const pfIdx = await unirepContract.getProofIndex(
+            computeProcessAttestationsProofHash(
+                outputBlindedUserState, 
+                outputBlindedHashChain, 
+                inputBlindedUserState, 
+                proof
+            )
+        )
+        expect(Number(pfIdx)).not.eq(0)
     })
 
     it('successfully process zero attestations', async () => {
@@ -42,5 +61,24 @@ describe('Process attestation circuit', function () {
         const { outputBlindedUserState, outputBlindedHashChain, inputBlindedUserState, proof } = await genInputForContract(Circuit.processAttestations, circuitInputs)
         const isProofValid = await unirepContract.verifyProcessAttestationProof( outputBlindedUserState, outputBlindedHashChain, inputBlindedUserState, proof)
         expect(isProofValid).to.be.true
+
+        const tx = await unirepContract.processAttestations(
+            outputBlindedUserState, 
+            outputBlindedHashChain, 
+            inputBlindedUserState, 
+            proof
+        )
+        const receipt = await tx.wait()
+        expect(receipt.status).equal(1)
+
+        const pfIdx = await unirepContract.getProofIndex(
+            computeProcessAttestationsProofHash(
+                outputBlindedUserState, 
+                outputBlindedHashChain, 
+                inputBlindedUserState, 
+                proof
+            )
+        )
+        expect(Number(pfIdx)).not.eq(0)
     })
 })

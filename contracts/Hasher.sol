@@ -40,7 +40,8 @@ contract Hasher is UnirepObjs {
             _input.epoch, 
             _input.epochKey, 
             _input.globalStateTree, 
-            _input.attesterId, 
+            _input.attesterId,
+            _input.userHasSignedUp,
             _input.proof
         ));
     }

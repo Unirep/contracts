@@ -4,8 +4,9 @@ import { ethers } from 'ethers'
 import { expect } from "chai"
 import { genIdentity, genRandomSalt} from "@unirep/crypto"
 import { Circuit } from "@unirep/circuits"
-import { genUserStateTransitionCircuitInput, getTreeDepthsForTesting, genInputForContract, UserTransitionProof } from './utils'
-import { deployUnirep } from '../src'
+import { genUserStateTransitionCircuitInput, getTreeDepthsForTesting, genInputForContract } from './utils'
+import { deployUnirep, UserTransitionProof } from '../src'
+import { epochLength } from '../config'
 
 describe('User State Transition', function () {
     this.timeout(600000)
@@ -14,6 +15,7 @@ describe('User State Transition', function () {
 
     const epoch = 1
     const user = genIdentity()
+    const proofIndexes = []
 
     before(async () => {
         accounts = await hardhatEthers.getSigners()
@@ -29,6 +31,22 @@ describe('User State Transition', function () {
         expect(isValid, 'Verify user state transition proof off-chain failed').to.be.true
         const isProofValid = await unirepContract.verifyUserStateTransition(input)
         expect(isProofValid).to.be.true
+
+        // UST should be performed after epoch transition
+        // Fast-forward epochLength of seconds
+        await hardhatEthers.provider.send("evm_increaseTime", [epochLength])
+        let tx = await unirepContract.beginEpochTransition()
+        let receipt = await tx.wait()
+        expect(receipt.status).equal(1)
+
+        tx = await unirepContract.updateUserStateRoot(
+            input, proofIndexes
+        )
+        receipt = await tx.wait()
+        expect(receipt.status).equal(1)
+
+        const pfIdx = await unirepContract.getProofIndex(input.hash())
+        expect(Number(pfIdx)).not.eq(0)
     })
 
     it('Proof with wrong epoch should fail', async () => {

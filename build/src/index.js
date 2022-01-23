@@ -3,8 +3,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Unirep = exports.getUnirepContract = exports.deployUnirep = exports.UserTransitionProof = exports.SignUpProof = exports.ReputationProof = exports.EpochKeyProof = exports.Attestation = exports.AttestationEvent = exports.Event = void 0;
+exports.Unirep = exports.getUnirepContract = exports.deployUnirep = exports.computeProcessAttestationsProofHash = exports.computeStartTransitionProofHash = exports.UserTransitionProof = exports.SignUpProof = exports.ReputationProof = exports.EpochKeyProof = exports.Attestation = exports.AttestationEvent = exports.Event = void 0;
 const ethers_1 = require("ethers");
+const crypto_1 = require("@unirep/crypto");
 const circuits_1 = require("@unirep/circuits");
 const config_1 = require("../config");
 const Unirep_json_1 = __importDefault(require("../artifacts/contracts/Unirep.sol/Unirep.json"));
@@ -15,7 +16,6 @@ const UserSignUpVerifier_json_1 = __importDefault(require("../artifacts/contract
 const StartTransitionVerifier_json_1 = __importDefault(require("../artifacts/contracts/StartTransitionVerifier.sol/StartTransitionVerifier.json"));
 const UserStateTransitionVerifier_json_1 = __importDefault(require("../artifacts/contracts/UserStateTransitionVerifier.sol/UserStateTransitionVerifier.json"));
 const ProcessAttestationsVerifier_json_1 = __importDefault(require("../artifacts/contracts/ProcessAttestationsVerifier.sol/ProcessAttestationsVerifier.json"));
-const crypto_1 = require("@unirep/crypto");
 var Event;
 (function (Event) {
     Event[Event["UserSignedUp"] = 0] = "UserSignedUp";
@@ -57,6 +57,11 @@ class EpochKeyProof {
             const proof_ = (0, circuits_1.formatProofForSnarkjsVerification)(this.proof.map(n => n.toString()));
             return (0, circuits_1.verifyProof)(circuits_1.Circuit.verifyEpochKey, proof_, this.publicSignals.map(n => BigInt(n.toString())));
         };
+        this.hash = () => {
+            const iface = new ethers_1.ethers.utils.Interface(Unirep_json_1.default.abi);
+            const abiEncoder = iface.encodeFunctionData('hashEpochKeyProof', [this]);
+            return ethers_1.ethers.utils.keccak256(rmFuncSigHash(abiEncoder));
+        };
         const formattedProof = (0, circuits_1.formatProofForVerifierContract)(_proof);
         this.globalStateTree = _publicSignals[0];
         this.epoch = _publicSignals[1];
@@ -71,6 +76,21 @@ class ReputationProof {
         this.verify = () => {
             const proof_ = (0, circuits_1.formatProofForSnarkjsVerification)(this.proof.map(n => n.toString()));
             return (0, circuits_1.verifyProof)(circuits_1.Circuit.proveReputation, proof_, this.publicSignals.map(n => BigInt(n.toString())));
+        };
+        this.hash = () => {
+            // array length should be fixed
+            const abiEncoder = ethers_1.ethers.utils.defaultAbiCoder.encode([`tuple(uint256[${config_1.maxReputationBudget}] repNullifiers,
+                    uint256 epoch,
+                    uint256 epochKey, 
+                    uint256 globalStateTree,
+                    uint256 attesterId,
+                    uint256 proveReputationAmount,
+                    uint256 minRep,
+                    uint256 proveGraffiti,
+                    uint256 graffitiPreImage,
+                    uint256[8] proof)
+            `], [this]);
+            return ethers_1.ethers.utils.keccak256(abiEncoder);
         };
         const formattedProof = (0, circuits_1.formatProofForVerifierContract)(_proof);
         this.repNullifiers = _publicSignals.slice(0, config_1.maxReputationBudget);
@@ -93,6 +113,11 @@ class SignUpProof {
             const proof_ = (0, circuits_1.formatProofForSnarkjsVerification)(this.proof.map(n => n.toString()));
             return (0, circuits_1.verifyProof)(circuits_1.Circuit.proveUserSignUp, proof_, this.publicSignals.map(n => BigInt(n.toString())));
         };
+        this.hash = () => {
+            const iface = new ethers_1.ethers.utils.Interface(Unirep_json_1.default.abi);
+            const abiEncoder = iface.encodeFunctionData('hashSignUpProof', [this]);
+            return ethers_1.ethers.utils.keccak256(rmFuncSigHash(abiEncoder));
+        };
         const formattedProof = (0, circuits_1.formatProofForVerifierContract)(_proof);
         this.epoch = _publicSignals[0];
         this.epochKey = _publicSignals[1];
@@ -109,6 +134,19 @@ class UserTransitionProof {
         this.verify = () => {
             const proof_ = (0, circuits_1.formatProofForSnarkjsVerification)(this.proof.map(n => n.toString()));
             return (0, circuits_1.verifyProof)(circuits_1.Circuit.userStateTransition, proof_, this.publicSignals.map(n => BigInt(n.toString())));
+        };
+        this.hash = () => {
+            // array length should be fixed
+            const abiEncoder = ethers_1.ethers.utils.defaultAbiCoder.encode([`tuple(uint256 newGlobalStateTreeLeaf,
+                    uint256[${config_1.numEpochKeyNoncePerEpoch}] epkNullifiers,
+                    uint256 transitionFromEpoch,
+                    uint256[2] blindedUserStates,
+                    uint256 fromGlobalStateTree,
+                    uint256[${config_1.numEpochKeyNoncePerEpoch}] blindedHashChains,
+                    uint256 fromEpochTree,
+                    uint256[8] proof)
+            `], [this]);
+            return ethers_1.ethers.utils.keccak256(abiEncoder);
         };
         const formattedProof = (0, circuits_1.formatProofForVerifierContract)(_proof);
         this.newGlobalStateTreeLeaf = _publicSignals[0];
@@ -131,6 +169,31 @@ class UserTransitionProof {
     }
 }
 exports.UserTransitionProof = UserTransitionProof;
+const computeStartTransitionProofHash = (blindedUserState, blindedHashChain, globalStateTree, proof) => {
+    const iface = new ethers_1.ethers.utils.Interface(Unirep_json_1.default.abi);
+    const abiEncoder = iface.encodeFunctionData('hashStartTransitionProof', [
+        blindedUserState,
+        blindedHashChain,
+        globalStateTree,
+        proof
+    ]);
+    return ethers_1.ethers.utils.keccak256(rmFuncSigHash(abiEncoder));
+};
+exports.computeStartTransitionProofHash = computeStartTransitionProofHash;
+const computeProcessAttestationsProofHash = (outputBlindedUserState, outputBlindedHashChain, inputBlindedUserState, proof) => {
+    const iface = new ethers_1.ethers.utils.Interface(Unirep_json_1.default.abi);
+    const abiEncoder = iface.encodeFunctionData('hashProcessAttestationsProof', [
+        outputBlindedUserState,
+        outputBlindedHashChain,
+        inputBlindedUserState,
+        proof
+    ]);
+    return ethers_1.ethers.utils.keccak256(rmFuncSigHash(abiEncoder));
+};
+exports.computeProcessAttestationsProofHash = computeProcessAttestationsProofHash;
+const rmFuncSigHash = (abiEncoder) => {
+    return (0, crypto_1.add0x)(abiEncoder.slice(10));
+};
 const deployUnirep = async (deployer, _treeDepths, _settings) => {
     let EpochKeyValidityVerifierContract, StartTransitionVerifierContract, ProcessAttestationsVerifierContract, UserStateTransitionVerifierContract, ReputationVerifierContract, UserSignUpVerifierContract;
     console.log('Deploying EpochKeyValidityVerifier');

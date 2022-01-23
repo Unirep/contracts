@@ -167,6 +167,9 @@ describe('Airdrop', function () {
             const receipt = await tx.wait()
             expect(receipt.status).equal(1)
 
+            const pfIdx = await unirepContract.getProofIndex(input.hash())
+            expect(Number(pfIdx)).not.eq(0)
+
             await expect(unirepContractCalledByAttester.airdropEpochKey(input))
                 .to.be.revertedWith('Unirep: the proof has been submitted before')
         })

@@ -3,10 +3,11 @@ import { ethers as hardhatEthers } from 'hardhat'
 import { ethers } from 'ethers'
 import { expect } from "chai"
 import { genRandomSalt, SNARK_FIELD_SIZE, genIdentity, genIdentityCommitment } from '@unirep/crypto'
+import { formatProofForSnarkjsVerification } from '@unirep/circuits'
 
 import { epochLength, maxAttesters, maxReputationBudget, maxUsers, numEpochKeyNoncePerEpoch } from '../config'
-import { genEpochKey, getTreeDepthsForTesting, Attestation, computeEpochKeyProofHash } from './utils'
-import { deployUnirep, Unirep } from '../src'
+import { genEpochKey, getTreeDepthsForTesting, Attestation } from './utils'
+import { deployUnirep, EpochKeyProof, Unirep } from '../src'
 
 describe('Attesting', () => {
     let unirepContract
@@ -17,14 +18,18 @@ describe('Attesting', () => {
     let attester2, unirepContractCalledByAttester2
 
     const signedUpInLeaf = 1
-    const proof: BigInt[] = []
+    const proof: string[] = []
     for (let i = 0; i < 8; i++) {
-        proof.push(BigInt(0))
+        proof.push('0')
     }
     const epoch = 1
     const nonce = 0
     const epochKey = genEpochKey(genRandomSalt(), epoch, nonce)
-    const epochKeyProof = [genRandomSalt(), epoch, epochKey, proof]
+    const publicSignals = [genRandomSalt(), epoch, epochKey]
+    const epochKeyProof = new EpochKeyProof(
+        publicSignals,
+        formatProofForSnarkjsVerification(proof)
+    )
     let epochKeyProofIndex
     const attestingFee = ethers.utils.parseEther("0.1")
 
@@ -72,7 +77,7 @@ describe('Attesting', () => {
 
         const proofNullifier = await unirepContract.hashEpochKeyProof(epochKeyProof)
         expect(receipt.status).equal(1)
-        const _proofNullifier = computeEpochKeyProofHash(epochKeyProof)
+        const _proofNullifier = epochKeyProof.hash()
         expect(_proofNullifier).equal(proofNullifier)
         epochKeyProofIndex = await unirepContract.getProofIndex(proofNullifier)
         expect(epochKeyProof).not.equal(null)

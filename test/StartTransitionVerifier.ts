@@ -6,7 +6,7 @@ import { hashLeftRight, genIdentity, genIdentityCommitment, SparseMerkleTreeImpl
 import { Circuit } from "@unirep/circuits"
 import { genStartTransitionCircuitInput, getTreeDepthsForTesting, bootstrapRandomUSTree, genInputForContract } from './utils'
 import { circuitGlobalStateTreeDepth } from "../config/"
-import { deployUnirep } from '../src'
+import { computeStartTransitionProofHash, deployUnirep } from '../src'
 
 
 describe('User State Transition circuits', function () {
@@ -50,7 +50,20 @@ describe('User State Transition circuits', function () {
                 const { blindedUserState, blindedHashChain, GSTRoot, proof } = await genInputForContract(Circuit.startTransition, circuitInputs)
                 const isProofValid = await unirepContract.verifyStartTransitionProof( blindedUserState, blindedHashChain, GSTRoot, proof)
                 expect(isProofValid).to.be.true
-                
+
+                const tx = await unirepContract.startUserStateTransition(blindedUserState, blindedHashChain, GSTRoot, proof)
+                const receipt = await tx.wait()
+                expect(receipt.status).equal(1)
+
+                const pfIdx = await unirepContract.getProofIndex(
+                    computeStartTransitionProofHash(
+                        blindedUserState, 
+                        blindedHashChain, 
+                        GSTRoot, 
+                        proof
+                    )
+                )
+                expect(Number(pfIdx)).not.eq(0)
             })
 
             it('User can start with different epoch key nonce', async () => {
@@ -60,6 +73,20 @@ describe('User State Transition circuits', function () {
                 const { blindedUserState, blindedHashChain, GSTRoot, proof } = await genInputForContract(Circuit.startTransition, circuitInputs)
                 const isProofValid = await unirepContract.verifyStartTransitionProof( blindedUserState, blindedHashChain, GSTRoot, proof)
                 expect(isProofValid).to.be.true
+
+                const tx = await unirepContract.startUserStateTransition(blindedUserState, blindedHashChain, GSTRoot, proof)
+                const receipt = await tx.wait()
+                expect(receipt.status).equal(1)
+
+                const pfIdx = await unirepContract.getProofIndex(
+                    computeStartTransitionProofHash(
+                        blindedUserState, 
+                        blindedHashChain, 
+                        GSTRoot, 
+                        proof
+                    )
+                )
+                expect(Number(pfIdx)).not.eq(0)
             })
         })
     })
