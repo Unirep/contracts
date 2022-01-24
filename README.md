@@ -1,4 +1,4 @@
-# Unirep contracts v1.0.4
+# Unirep contracts v1.0.5
 
 ## Install and build
 ```shell
@@ -12,6 +12,8 @@ yarn test
 ```
 
 ## Utils
+- `computeStartTransitionProofHash`
+- `computeProcessAttestationsProofHash`
 - `deployUnirep`
 - `getUnirepContract`
 
@@ -27,6 +29,11 @@ yarn test
 - `UnirepObjs.sol`
 - `UserSignUpVerifier.sol`
 - `UserStateTransitionVerifier.sol`
+
+## v1.0.5 Update log
+- Remove Poseidon hash on-chain
+- Export proof struct: `EpochKeyProof`, `ReputationProof`, `SignUpProof`, `UserTransitionProof`
+- Export event enum: `Event`, `AttestationEvent`
 
 ## v1.0.4 Update log
 - Update @unirep/circuits version

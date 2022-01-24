@@ -1,7 +1,7 @@
 import { ethers } from 'ethers'
 import { add0x, hash5, SnarkProof } from '@unirep/crypto'
 import { Circuit, formatProofForSnarkjsVerification, formatProofForVerifierContract, verifyProof } from '@unirep/circuits'
-import { maxUsers, maxAttesters, numEpochKeyNoncePerEpoch, epochLength, attestingFee, maxReputationBudget, globalStateTreeDepth } from '../config'
+import { maxUsers, maxAttesters, numEpochKeyNoncePerEpoch, epochLength, attestingFee, maxReputationBudget } from '../config'
 
 import Unirep from "../artifacts/contracts/Unirep.sol/Unirep.json"
 import EpochKeyValidityVerifier from "../artifacts/contracts/EpochKeyValidityVerifier.sol/EpochKeyValidityVerifier.json"
