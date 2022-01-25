@@ -835,7 +835,7 @@
 
 "@unirep/circuits@git+https://github.com/Unirep/circuits.git":
   version "1.0.4"
-  resolved "git+https://github.com/Unirep/circuits.git#aa8559e5210f25ee903f5d3846b36b3696b569f6"
+  resolved "git+https://github.com/Unirep/circuits.git#7d83677d07d7f71994214561ef5921eb9ff41b62"
   dependencies:
     "@unirep/crypto" "git+https://github.com/Unirep/crypto.git"
     argparse "^2.0.1"
