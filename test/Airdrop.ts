@@ -2,7 +2,7 @@
 import { ethers as hardhatEthers } from 'hardhat'
 import { ethers } from 'ethers'
 import { expect } from "chai"
-import { genIdentity, genIdentityCommitment } from '@unirep/crypto'
+import { genIdentity, genIdentityCommitment, genRandomSalt } from '@unirep/crypto'
 import { Circuit } from '@unirep/circuits'
 
 import { attestingFee, epochLength, maxUsers, numEpochKeyNoncePerEpoch, maxReputationBudget, maxAttesters } from '../config'
@@ -204,7 +204,7 @@ describe('Airdrop', function () {
                 .to.be.revertedWith('Unirep: no attesting fee or incorrect amount')
         })
 
-        it('get airdrop through a wrong attester should fail',async () => {
+        it('get airdrop through a wrong epoch should fail',async () => {
             const wrongEpoch = currentEpoch + 1
             const signUpCircuitInputs = await genProveSignUpCircuitInput(userId, wrongEpoch, reputationRecords, attesterId_)
             const input = await genInputForContract(Circuit.proveUserSignUp, signUpCircuitInputs)
@@ -214,6 +214,16 @@ describe('Airdrop', function () {
 
             await expect(unirepContractCalledByAttester.airdropEpochKey(input, { value: attestingFee }))
                 .to.be.revertedWith('Unirep: submit an airdrop proof with incorrect epoch')
+        })
+
+        it('submit an invalid epoch key should fail',async () => {
+            const signUpCircuitInputs = await genProveSignUpCircuitInput(userId, currentEpoch, reputationRecords, attesterId_)
+            const input = await genInputForContract(Circuit.proveUserSignUp, signUpCircuitInputs)
+            unirepContractCalledByAttester = unirepContract.connect(accounts[0])
+            input.epochKey = genRandomSalt()
+
+            await expect(unirepContractCalledByAttester.airdropEpochKey(input, { value: attestingFee }))
+                .to.be.revertedWith('Unirep: invalid epoch key range')
         })
     })
 })
