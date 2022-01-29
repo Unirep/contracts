@@ -1,4 +1,4 @@
-# Unirep contracts v1.0.5
+# Unirep contracts v1.0.6
 
 ## Install and build
 ```shell
@@ -29,6 +29,12 @@ yarn test
 - `UnirepObjs.sol`
 - `UserSignUpVerifier.sol`
 - `UserStateTransitionVerifier.sol`
+
+## v1.0.6 Update log
+- Add a `fromProofIndex` input in `submitAttestation` and `submitAttestationViaRelayer`, and emit the `fromProofIndex`
+- If the attestation is not from `spendReputation`, just input `0`
+- Check epoch key range on chain
+- Update packages
 
 ## v1.0.5 Update log
 - Remove Poseidon hash on-chain
