@@ -172,4 +172,14 @@ describe('Verify reputation verifier', function () {
             {value: attestingFee},
         )).to.be.revertedWith('Unirep: invalid number of reputation nullifiers')
     })
+
+    it('submit reputation nullifiers with wrong epoch key should fail', async () => {
+        const circuitInputs = await genReputationCircuitInput(user, epoch, nonce, reputationRecords, attesterId, repNullifiersAmount, minRep , proveGraffiti, )
+        const input: ReputationProof = await genInputForContract(Circuit.proveReputation, circuitInputs)
+        input.epochKey = genRandomSalt()
+        await expect(unirepContractCalledByAttester.spendReputation(
+            input,
+            {value: attestingFee},
+        )).to.be.revertedWith('Unirep: invalid epoch key range')
+    })
 })

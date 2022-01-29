@@ -88,10 +88,12 @@ describe('Attesting', () => {
             BigInt(signedUpInLeaf),
         )
         
+        const senderPfIdx = 0
         const tx = await unirepContractCalledByAttester.submitAttestation(
             attestation,
             epochKey,
             proofIndex,
+            senderPfIdx,
             {value: attestingFee}
         )
         const receipt = await tx.wait()
