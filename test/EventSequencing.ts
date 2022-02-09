@@ -92,6 +92,7 @@ describe('EventSequencing', () => {
 
         // 3. Attest to first user
         const signedUpInLeaf = 0
+        const senderPfIdx = 0
         let attestation: Attestation = new Attestation(
             BigInt(attesterId),
             BigInt(1),
@@ -103,6 +104,7 @@ describe('EventSequencing', () => {
             attestation,
             epochKey,
             epochKeyProofIndex,
+            senderPfIdx,
             {value: attestingFee}
         )
         receipt = await tx.wait()
@@ -199,6 +201,7 @@ describe('EventSequencing', () => {
             attestation,
             epochKey,
             epochKeyProofIndex,
+            senderPfIdx,
             {value: attestingFee}
         )
         receipt = await tx.wait()

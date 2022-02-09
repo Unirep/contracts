@@ -46,6 +46,8 @@ contract Unirep is SnarkConstants, Hasher {
 
     uint256 immutable public epochLength;
 
+    uint256 immutable public maxEpochKey;
+
     uint256 public latestEpochTransitionTime;
 
     // Maximum number of epoch keys allowed for an user to generate in one epoch
@@ -116,14 +118,14 @@ contract Unirep is SnarkConstants, Hasher {
         uint256 _proofIndex
     );
 
-    // @ _proofIndex: the proof index of th receiver's epoch key
     event AttestationSubmitted(
         uint256 indexed _epoch,
         uint256 indexed _epochKey,
         address indexed _attester,
         AttestationEvent _event,
         Attestation _attestation,
-        uint256 _proofIndex
+        uint256 toProofIndex,
+        uint256 fromProofIndex
     );
 
     event EpochEnded(uint256 indexed _epoch);
@@ -215,6 +217,8 @@ contract Unirep is SnarkConstants, Hasher {
         require(_maxValues.maxAttesters <= USTMaxLeafIndex, "Unirep: invalid maxAttesters value");
         maxAttesters = _maxValues.maxAttesters;
 
+        maxEpochKey = uint256(2) ** _treeDepths.epochTreeDepth - 1;
+
         attestingFee = _attestingFee;
     }
 
@@ -222,7 +226,7 @@ contract Unirep is SnarkConstants, Hasher {
      * User signs up by providing an identity commitment. It also inserts a fresh state
      * leaf into the state tree.
      * if user signs up through an atteser who sets airdrop, Unirep will give the user the airdrop reputation.
-     * @param _identityCommitment Commitment of the user's identity which is a semaphore identity.
+     * @param identityCommitment Commitment of the user's identity which is a semaphore identity.
      */
     function userSignUp(uint256 _identityCommitment) external {
         require(msg.sender == admin || attesters[msg.sender] > 0, "Unirep: sign up should through an admin or an attester");
@@ -307,18 +311,26 @@ contract Unirep is SnarkConstants, Hasher {
      * An attester submit the attestation with a proof index
      * @param attestation The attestation that the attester wants to send to the epoch key
      * @param epochKey The epoch key which receives attestation
-     * @param _proofIndex The proof index of the epoch key, which might be epochKeyProof, signedUpProof, reputationProof
+     * @param toProofIndex The proof index of the receiver's epoch key, which might be epochKeyProof, signedUpProof, reputationProof
+     * @param fromProofIndex The proof index of the sender's epoch key, which can only be reputationProof, if the attest is not from reputationProof, then fromProofIdx = 0
      */
     function submitAttestation(
         Attestation calldata attestation, 
-        uint256 epochKey, 
-        uint256 _proofIndex
+        uint256 epochKey,
+        uint256 toProofIndex,
+        uint256 fromProofIndex
     ) external payable {
         require(attesters[msg.sender] > 0, "Unirep: attester has not signed up yet");
         require(attesters[msg.sender] == attestation.attesterId, "Unirep: mismatched attesterId");
         require(msg.value == attestingFee, "Unirep: no attesting fee or incorrect amount");
-        require((_proofIndex != 0) && (_proofIndex < proofIndex), "Unirep: invalid proof index");
+        require(
+            toProofIndex != 0 &&
+            toProofIndex < proofIndex && 
+            fromProofIndex < proofIndex, 
+            "Unirep: invalid proof index"
+        );
         require(attestation.signUp == 0 || attestation.signUp == 1, "Unirep: invalid sign up flag");
+        require(epochKey <= maxEpochKey, "Unirep: invalid epoch key range");
 
         // Add to the cumulated attesting fee
         collectedAttestingFee = collectedAttestingFee.add(msg.value);
@@ -328,7 +340,8 @@ contract Unirep is SnarkConstants, Hasher {
             msg.sender, 
             attestation, 
             epochKey, 
-            _proofIndex, 
+            toProofIndex,
+            fromProofIndex, 
             AttestationEvent.SendAttestation
         );
     }
@@ -339,21 +352,29 @@ contract Unirep is SnarkConstants, Hasher {
      * @param signature The signature of the attester
      * @param attestation The attestation including positive reputation, negative reputation or graffiti
      * @param epochKey The epoch key which receives attestation
-     * @param _proofIndex The proof index of the epoch key, which might be epochKeyProof, signedUpProof, reputationProof
+     * @param toProofIndex The proof index of the receiver's epoch key, which might be epochKeyProof, signedUpProof, reputationProof
+     * @param fromProofIndex The proof index of the sender's epoch key, which can only be reputationProof, if the attest is not from reputationProof, then fromProofIdx = 0
      */
     function submitAttestationViaRelayer(
         address attester,
         bytes calldata signature,
         Attestation calldata attestation,
         uint256 epochKey,
-        uint256 _proofIndex
+        uint256 toProofIndex,
+        uint256 fromProofIndex
     ) external payable {
         verifySignature(attester, signature);
         require(attesters[attester] > 0, "Unirep: attester has not signed up yet");
         require(attesters[attester] == attestation.attesterId, "Unirep: mismatched attesterId");
         require(msg.value == attestingFee, "Unirep: no attesting fee or incorrect amount");
-        require((_proofIndex != 0) && (_proofIndex < proofIndex), "Unirep: invalid proof index");
+        require(
+            toProofIndex != 0 &&
+            toProofIndex < proofIndex && 
+            fromProofIndex < proofIndex, 
+            "Unirep: invalid proof index"
+        );
         require(attestation.signUp == 0 || attestation.signUp == 1, "Unirep: invalid sign up flag");
+        require(epochKey <= maxEpochKey, "Unirep: invalid epoch key range");
 
         // Add to the cumulated attesting fee
         collectedAttestingFee = collectedAttestingFee.add(msg.value);
@@ -363,7 +384,8 @@ contract Unirep is SnarkConstants, Hasher {
             attester, 
             attestation, 
             epochKey, 
-            _proofIndex, 
+            toProofIndex,
+            fromProofIndex, 
             AttestationEvent.SendAttestation
         );
     }
@@ -376,6 +398,7 @@ contract Unirep is SnarkConstants, Hasher {
         bytes32 proofNullifier = Hasher.hashEpochKeyProof(_input);
         require(getProofIndex[proofNullifier] == 0, "Unirep: the proof has been submitted before");
         require(_input.epoch == currentEpoch, "Unirep: submit an epoch key proof with incorrect epoch");
+        require(_input.epochKey <= maxEpochKey, "Unirep: invalid epoch key range");
 
         // emit proof event
         uint256 _proofIndex = proofIndex;
@@ -401,6 +424,7 @@ contract Unirep is SnarkConstants, Hasher {
         require(attesters[msg.sender] == _input.attesterId, "Unirep: mismatched attesterId");
         require(msg.value == attestingFee, "Unirep: no attesting fee or incorrect amount");
         require(_input.epoch == currentEpoch, "Unirep: submit an airdrop proof with incorrect epoch");
+        require(_input.epochKey <= maxEpochKey, "Unirep: invalid epoch key range");
 
         // Add to the cumulated attesting fee
         collectedAttestingFee = collectedAttestingFee.add(msg.value);
@@ -425,6 +449,7 @@ contract Unirep is SnarkConstants, Hasher {
             attestation, 
             _input.epochKey, 
             _proofIndex, 
+            0,
             AttestationEvent.Airdrop
         );
         getProofIndex[proofNullifier] = _proofIndex;
@@ -444,6 +469,7 @@ contract Unirep is SnarkConstants, Hasher {
         require(_input.repNullifiers.length == maxReputationBudget, "Unirep: invalid number of reputation nullifiers");
         require(_input.epoch == currentEpoch, "Unirep: submit a reputation proof with incorrect epoch");
         require(attesters[msg.sender] == _input.attesterId, "Unirep: incorrect attester ID in the reputation proof");
+        require(_input.epochKey <= maxEpochKey, "Unirep: invalid epoch key range");
 
         // Add to the cumulated attesting fee
         collectedAttestingFee = collectedAttestingFee.add(msg.value);
@@ -467,6 +493,7 @@ contract Unirep is SnarkConstants, Hasher {
             attestation, 
             _input.epochKey, 
             _proofIndex, 
+            0,
             AttestationEvent.SpendReputation
         );
         getProofIndex[proofNullifier] = _proofIndex;
@@ -477,7 +504,8 @@ contract Unirep is SnarkConstants, Hasher {
         address attester, 
         Attestation memory attestation, 
         uint256 epochKey,
-        uint256 _proofIndex, 
+        uint256 toProofIndex,
+        uint256 fromProofIndex, 
         AttestationEvent _event
     ) internal {
 
@@ -495,7 +523,8 @@ contract Unirep is SnarkConstants, Hasher {
             attester,
             _event,
             attestation,
-            _proofIndex
+            toProofIndex,
+            fromProofIndex
         );
     }
 

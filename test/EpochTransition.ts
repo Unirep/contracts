@@ -80,6 +80,7 @@ describe('Epoch Transition', function () {
         expect(receipt.status).equal(1)
         let proofNullifier = await unirepContract.hashEpochKeyProof(input)
         epochKeyProofIndex = await unirepContract.getProofIndex(proofNullifier)
+        const senderPfIdx = 0
 
         // Submit attestations
         const attestationNum = 6
@@ -95,6 +96,7 @@ describe('Epoch Transition', function () {
                 attestation,
                 epochKey,
                 epochKeyProofIndex,
+                senderPfIdx,
                 {value: attestingFee}
             )
             receipt = await tx.wait()
