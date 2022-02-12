@@ -72,6 +72,10 @@ contract Unirep is SnarkConstants, Hasher {
     // We use an admin to controll user sign up
     address internal admin;
 
+    // The index of attestations
+    // To indicate the sequence of attestations
+    uint256 internal attestIndex = 1;
+
     // Mapping of proof nullifiers and the proof index
     mapping(bytes32 => uint256) public getProofIndex;
 
@@ -125,7 +129,8 @@ contract Unirep is SnarkConstants, Hasher {
         AttestationEvent _event,
         Attestation _attestation,
         uint256 toProofIndex,
-        uint256 fromProofIndex
+        uint256 fromProofIndex,
+        uint256 attestIndex
     );
 
     event EpochEnded(uint256 indexed _epoch);
@@ -524,8 +529,11 @@ contract Unirep is SnarkConstants, Hasher {
             _event,
             attestation,
             toProofIndex,
-            fromProofIndex
+            fromProofIndex,
+            attestIndex
         );
+
+        attestIndex ++;
     }
 
     function beginEpochTransition() external {
