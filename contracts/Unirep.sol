@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma abicoder v2;
-pragma solidity 0.8.0;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
@@ -64,7 +64,7 @@ contract Unirep is SnarkConstants, Hasher {
 
     uint256 public numUserSignUps = 0;
 
-    // The index of all proofs, 
+    // The index of all proofs,
     // 0 is reserved for index not found in getProofIndex
     uint256 internal proofIndex = 1;
 
@@ -237,7 +237,7 @@ contract Unirep is SnarkConstants, Hasher {
         require(msg.sender == admin || attesters[msg.sender] > 0, "Unirep: sign up should through an admin or an attester");
         require(hasUserSignedUp[_identityCommitment] == false, "Unirep: the user has already signed up");
         require(numUserSignUps < maxUsers, "Unirep: maximum number of user signups reached");
-        
+
         uint256 attesterId = attesters[msg.sender];
         uint256 airdropPosRep = airdropAmount[msg.sender];
 
@@ -246,9 +246,9 @@ contract Unirep is SnarkConstants, Hasher {
 
         emit Sequencer(currentEpoch, Event.UserSignedUp);
         emit UserSignedUp(
-            currentEpoch, 
-            _identityCommitment, 
-            attesterId, 
+            currentEpoch,
+            _identityCommitment,
+            attesterId,
             airdropPosRep
         );
     }
@@ -291,7 +291,7 @@ contract Unirep is SnarkConstants, Hasher {
      * @param signature The signature of the attester
      */
     function attesterSignUpViaRelayer(
-        address attester, 
+        address attester,
         bytes calldata signature
     ) external {
         require(attesters[attester] == 0, "Unirep: attester has already signed up");
@@ -320,7 +320,7 @@ contract Unirep is SnarkConstants, Hasher {
      * @param fromProofIndex The proof index of the sender's epoch key, which can only be reputationProof, if the attest is not from reputationProof, then fromProofIdx = 0
      */
     function submitAttestation(
-        Attestation calldata attestation, 
+        Attestation calldata attestation,
         uint256 epochKey,
         uint256 toProofIndex,
         uint256 fromProofIndex
@@ -330,8 +330,8 @@ contract Unirep is SnarkConstants, Hasher {
         require(msg.value == attestingFee, "Unirep: no attesting fee or incorrect amount");
         require(
             toProofIndex != 0 &&
-            toProofIndex < proofIndex && 
-            fromProofIndex < proofIndex, 
+            toProofIndex < proofIndex &&
+            fromProofIndex < proofIndex,
             "Unirep: invalid proof index"
         );
         require(attestation.signUp == 0 || attestation.signUp == 1, "Unirep: invalid sign up flag");
@@ -342,11 +342,11 @@ contract Unirep is SnarkConstants, Hasher {
 
          // Process attestation
         emitAttestationEvent(
-            msg.sender, 
-            attestation, 
-            epochKey, 
+            msg.sender,
+            attestation,
+            epochKey,
             toProofIndex,
-            fromProofIndex, 
+            fromProofIndex,
             AttestationEvent.SendAttestation
         );
     }
@@ -374,8 +374,8 @@ contract Unirep is SnarkConstants, Hasher {
         require(msg.value == attestingFee, "Unirep: no attesting fee or incorrect amount");
         require(
             toProofIndex != 0 &&
-            toProofIndex < proofIndex && 
-            fromProofIndex < proofIndex, 
+            toProofIndex < proofIndex &&
+            fromProofIndex < proofIndex,
             "Unirep: invalid proof index"
         );
         require(attestation.signUp == 0 || attestation.signUp == 1, "Unirep: invalid sign up flag");
@@ -386,18 +386,18 @@ contract Unirep is SnarkConstants, Hasher {
 
         // Process attestation
         emitAttestationEvent(
-            attester, 
-            attestation, 
-            epochKey, 
+            attester,
+            attestation,
+            epochKey,
             toProofIndex,
-            fromProofIndex, 
+            fromProofIndex,
             AttestationEvent.SendAttestation
         );
     }
 
     /*
      * A user should submit an epoch key proof and get a proof index
-     * @param _input The epoch key proof and the public signals 
+     * @param _input The epoch key proof and the public signals
      */
     function submitEpochKeyProof(EpochKeyProof memory _input) external {
         bytes32 proofNullifier = Hasher.hashEpochKeyProof(_input);
@@ -408,9 +408,9 @@ contract Unirep is SnarkConstants, Hasher {
         // emit proof event
         uint256 _proofIndex = proofIndex;
         emit IndexedEpochKeyProof(
-            _proofIndex, 
-            currentEpoch, 
-            _input.epochKey, 
+            _proofIndex,
+            currentEpoch,
+            _input.epochKey,
             _input
         );
         getProofIndex[proofNullifier] = _proofIndex;
@@ -420,7 +420,7 @@ contract Unirep is SnarkConstants, Hasher {
     /*
      * An attester submit the airdrop attestation to an epoch key with a sign up proof
      * @param attestation The attestation that the attester wants to send to the epoch key
-     * @param _input The epoch key and its proof and the public signals 
+     * @param _input The epoch key and its proof and the public signals
      */
     function airdropEpochKey(SignUpProof memory _input) external payable {
         bytes32 proofNullifier = Hasher.hashSignUpProof(_input);
@@ -443,17 +443,17 @@ contract Unirep is SnarkConstants, Hasher {
         uint256 _proofIndex = proofIndex;
         // emit proof event
         emit IndexedUserSignedUpProof(
-            _proofIndex, 
-            currentEpoch, 
-            _input.epochKey, 
+            _proofIndex,
+            currentEpoch,
+            _input.epochKey,
             _input
         );
         // Process attestation
         emitAttestationEvent(
-            msg.sender, 
-            attestation, 
-            _input.epochKey, 
-            _proofIndex, 
+            msg.sender,
+            attestation,
+            _input.epochKey,
+            _proofIndex,
             0,
             AttestationEvent.Airdrop
         );
@@ -463,7 +463,7 @@ contract Unirep is SnarkConstants, Hasher {
 
     /*
      * A user spend reputation via an attester, the non-zero nullifiers will be processed as a negative attestation
-     * @param _input The epoch key and its proof and the public signals 
+     * @param _input The epoch key and its proof and the public signals
      */
     function spendReputation(ReputationProof memory _input) external payable {
         bytes32 proofNullifier = Hasher.hashReputationProof(_input);
@@ -487,17 +487,17 @@ contract Unirep is SnarkConstants, Hasher {
         uint256 _proofIndex = proofIndex;
         // emit proof event
         emit IndexedReputationProof(
-            _proofIndex, 
+            _proofIndex,
             currentEpoch,
             _input.epochKey,
             _input
         );
         // Process attestation
         emitAttestationEvent(
-            msg.sender, 
-            attestation, 
-            _input.epochKey, 
-            _proofIndex, 
+            msg.sender,
+            attestation,
+            _input.epochKey,
+            _proofIndex,
             0,
             AttestationEvent.SpendReputation
         );
@@ -506,11 +506,11 @@ contract Unirep is SnarkConstants, Hasher {
     }
 
     function emitAttestationEvent(
-        address attester, 
-        Attestation memory attestation, 
+        address attester,
+        Attestation memory attestation,
         uint256 epochKey,
         uint256 toProofIndex,
-        uint256 fromProofIndex, 
+        uint256 fromProofIndex,
         AttestationEvent _event
     ) internal {
 
@@ -560,13 +560,13 @@ contract Unirep is SnarkConstants, Hasher {
     ) external {
         bytes32 proofNullifier = Hasher.hashStartTransitionProof(_blindedUserState, _blindedHashChain, _globalStateTree, _proof);
         require(getProofIndex[proofNullifier] == 0, "Unirep: the proof has been submitted before");
-        
+
         uint256 _proofIndex = proofIndex;
         emit IndexedStartedTransitionProof(
-            _proofIndex, 
-            _blindedUserState, 
-            _globalStateTree, 
-            _blindedHashChain, 
+            _proofIndex,
+            _blindedUserState,
+            _globalStateTree,
+            _blindedHashChain,
             _proof
         );
         getProofIndex[proofNullifier] = _proofIndex;
@@ -584,10 +584,10 @@ contract Unirep is SnarkConstants, Hasher {
 
         uint256 _proofIndex = proofIndex;
         emit IndexedProcessedAttestationsProof(
-            _proofIndex, 
-            _inputBlindedUserState, 
-            _outputBlindedUserState, 
-            _outputBlindedHashChain, 
+            _proofIndex,
+            _inputBlindedUserState,
+            _outputBlindedUserState,
+            _outputBlindedHashChain,
             _proof
         );
         getProofIndex[proofNullifier] = _proofIndex;
@@ -605,17 +605,17 @@ contract Unirep is SnarkConstants, Hasher {
         for (uint256 i = 0; i < proofIndexRecords.length; i++) {
             require(proofIndexRecords[i] != 0 && (proofIndexRecords[i] < proofIndex), "Unirep: invalid proof index");
         }
-        
+
         uint256 _proofIndex = proofIndex;
         emit Sequencer(currentEpoch, Event.UserStateTransitioned);
         emit IndexedUserStateTransitionProof(
-            _proofIndex, 
-            _proof, 
+            _proofIndex,
+            _proof,
             proofIndexRecords
         );
         emit UserStateTransitioned(
-            currentEpoch, 
-            _proof.newGlobalStateTreeLeaf, 
+            currentEpoch,
+            _proof.newGlobalStateTreeLeaf,
             _proofIndex
         );
 
@@ -647,7 +647,7 @@ contract Unirep is SnarkConstants, Hasher {
 
         ProofsRelated memory proof;
         // Unpack the snark proof
-        (   
+        (
             proof.a,
             proof.b,
             proof.c
@@ -681,7 +681,7 @@ contract Unirep is SnarkConstants, Hasher {
 
         ProofsRelated memory proof;
         // Unpack the snark proof
-        (   
+        (
             proof.a,
             proof.b,
             proof.c
@@ -715,7 +715,7 @@ contract Unirep is SnarkConstants, Hasher {
 
         ProofsRelated memory proof;
         // Unpack the snark proof
-        (   
+        (
             proof.a,
             proof.b,
             proof.c
@@ -758,7 +758,7 @@ contract Unirep is SnarkConstants, Hasher {
         }
         ProofsRelated memory proof;
         // Unpack the snark proof
-        (   
+        (
             proof.a,
             proof.b,
             proof.c
@@ -801,7 +801,7 @@ contract Unirep is SnarkConstants, Hasher {
 
         ProofsRelated memory proof;
         // Unpack the snark proof
-        (   
+        (
             proof.a,
             proof.b,
             proof.c
@@ -836,7 +836,7 @@ contract Unirep is SnarkConstants, Hasher {
 
         ProofsRelated memory proof;
         // Unpack the snark proof
-        (   
+        (
             proof.a,
             proof.b,
             proof.c
