@@ -6,7 +6,7 @@ Object.defineProperty(exports, "circuitGlobalStateTreeDepth", { enumerable: true
 Object.defineProperty(exports, "circuitUserStateTreeDepth", { enumerable: true, get: function () { return config_1.circuitUserStateTreeDepth; } });
 Object.defineProperty(exports, "circuitEpochTreeDepth", { enumerable: true, get: function () { return config_1.circuitEpochTreeDepth; } });
 const ethers_1 = require("ethers");
-const attestingFee = ethers_1.ethers.utils.parseEther("0.1");
+const attestingFee = ethers_1.ethers.utils.parseEther("0");
 exports.attestingFee = attestingFee;
 const numEpochKeyNoncePerEpoch = 3;
 exports.numEpochKeyNoncePerEpoch = numEpochKeyNoncePerEpoch;

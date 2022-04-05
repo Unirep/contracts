@@ -1,7 +1,7 @@
 import { circuitGlobalStateTreeDepth, circuitUserStateTreeDepth, circuitEpochTreeDepth } from '@unirep/circuits/config';
 import { ethers } from 'ethers'
 
-const attestingFee = ethers.utils.parseEther("0.1")
+const attestingFee = ethers.utils.parseEther("0")
 
 const numEpochKeyNoncePerEpoch = 3;
 
