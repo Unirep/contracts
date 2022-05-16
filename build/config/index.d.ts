@@ -1,14 +1,12 @@
+import { circuitGlobalStateTreeDepth, circuitUserStateTreeDepth, circuitEpochTreeDepth } from '@unirep/circuits/config';
 import { ethers } from 'ethers';
 declare const attestingFee: ethers.BigNumber;
 declare const numEpochKeyNoncePerEpoch = 3;
 declare const numAttestationsPerProof = 5;
 declare const epochLength = 30;
-declare const circuitGlobalStateTreeDepth = 4;
-declare const circuitUserStateTreeDepth = 4;
-declare const circuitEpochTreeDepth = 32;
-declare const globalStateTreeDepth = 4;
-declare const userStateTreeDepth = 4;
-declare const epochTreeDepth = 32;
+declare const globalStateTreeDepth = 11;
+declare const userStateTreeDepth = 5;
+declare const epochTreeDepth = 64;
 declare const maxReputationBudget = 10;
 declare const maxUsers: number;
 declare const maxAttesters: number;

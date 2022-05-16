@@ -96,22 +96,23 @@ describe('Airdrop', function () {
             const isValid = await genProofAndVerify(Circuit.proveReputation, circuitInputs)
             expect(isValid, 'Verify reputation proof off-chain failed').to.be.false
         })
+        
+        // We set the admin in Alpha test, user should sign up with admin account or an attester
+        // it('user signs up through a non-signed up attester should succeed and gets no airdrop', async() => {
+        //     console.log('User sign up')
+        //     const userId = genIdentity()
+        //     const userCommitment = genIdentityCommitment(userId)
+        //     unirepContractCalledByAttester = unirepContract.connect(accounts[2])
+        //     let tx = await unirepContractCalledByAttester.userSignUp(userCommitment)
+        //     let receipt = await tx.wait()
+        //     expect(receipt.status).equal(1)
     
-        it('user signs up through a non-signed up attester should succeed and gets no airdrop', async() => {
-            console.log('User sign up')
-            const userId = genIdentity()
-            const userCommitment = genIdentityCommitment(userId)
-            unirepContractCalledByAttester = unirepContract.connect(accounts[2])
-            let tx = await unirepContractCalledByAttester.userSignUp(userCommitment)
-            let receipt = await tx.wait()
-            expect(receipt.status).equal(1)
-    
-            const signUpFilter = unirepContract.filters.UserSignedUp()
-            const signUpEvents =  await unirepContract.queryFilter(signUpFilter)
-            const commitment_ = signUpEvents[numUsers].args._identityCommitment
-            expect(commitment_).equal(userCommitment)
-            numUsers ++
-        })
+        //     const signUpFilter = unirepContract.filters.UserSignedUp()
+        //     const signUpEvents =  await unirepContract.queryFilter(signUpFilter)
+        //     const commitment_ = signUpEvents[numUsers].args._identityCommitment
+        //     expect(commitment_).equal(userCommitment)
+        //     numUsers ++
+        // })
     })
 
     describe('Users get airdrop', () => {

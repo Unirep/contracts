@@ -1174,9 +1174,9 @@
   resolved "https://registry.yarnpkg.com/@ungap/promise-all-settled/-/promise-all-settled-1.1.2.tgz#aa58042711d6e3275dd37dc597e5d31e8c290a44"
   integrity sha512-sL/cEvJWAnClXw0wHk85/2L0G6Sj8UB0Ctc1TEMbKSsmpRosqhwj9gWgFRZSrBr2f9tiXISwNhCPmlfqUqyb9Q==
 
-"@unirep/circuits@git+https://github.com/Unirep/circuits.git":
+"@unirep/circuits@git+https://github.com/Unirep/circuits.git#alpha":
   version "1.0.4"
-  resolved "git+https://github.com/Unirep/circuits.git#7d83677d07d7f71994214561ef5921eb9ff41b62"
+  resolved "git+https://github.com/Unirep/circuits.git#3197ea519719aad25c6afbdeaf4978fdd288f3cb"
   dependencies:
     "@unirep/crypto" "git+https://github.com/Unirep/crypto.git"
     argparse "^2.0.1"
